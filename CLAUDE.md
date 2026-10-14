@@ -22,6 +22,19 @@ and setup, CHANGELOG.md for history.
   via UTC. Never use local `Date` arithmetic elsewhere.
 - `css/app.css`: tokens on `:root` (light + dark), then sections per area.
 - `sw.js`: offline cache. **Add any new file to `SHELL`.**
+- `js/demo.js`: design preview (`?demo`), in-memory sample data. DESIGN.md has
+  the Figma workflow, layer names and the URL options.
+
+## Figma
+
+Design file key `52orOIzQZKKVSt9EeObl2X` (see DESIGN.md). Figma variables are
+the source of truth for design values: each one's WEB code syntax names the
+CSS custom property it maps to (`var(--bg)`, `var(--hh)`, `var(--radius-event)`,
+`var(--ink-blue)`, …). Use those exact names in `css/app.css`; some don't exist
+in the CSS yet. Figma gotchas met so far: SF Pro can't be used for instance
+text (styles use Inter), and paint opacity on variable-bound fills resets
+inside frames with explicit variable modes, so tints are separate layers with
+layer opacity.
 
 ## Data
 

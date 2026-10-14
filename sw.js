@@ -13,6 +13,7 @@ const SHELL = [
   'js/cloud.js',
   'js/config.js',
   'js/dates.js',
+  'js/demo.js',
   'js/dialogs.js',
   'js/icons.js',
   'js/main.js',

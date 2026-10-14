@@ -420,7 +420,9 @@ export function settingsDialog({ settings, sync, lastBackup, onChange, actions }
   const syncHtml = sync.kind === 'cloud'
     ? `<p class="sync-line">${icons.cloud}<span>Signed in as <b>${esc(sync.email || '')}</b>. Changes sync to your other devices.</span></p>
        <button type="button" class="btn" data-act="signOut">Sign out</button>`
-    : `<p class="sync-line">${icons.device}<span>Saved on this device only. To use the same planner on your phone and PC, turn on sync (see “Turn on sync” in README.md).</span></p>`;
+    : sync.kind === 'demo'
+      ? `<p class="sync-line">${icons.device}<span>Design preview with sample data. Nothing here is saved, and your real calendar isn’t touched.</span></p>`
+      : `<p class="sync-line">${icons.device}<span>Saved on this device only. To use the same planner on your phone and PC, turn on sync (see “Turn on sync” in README.md).</span></p>`;
   const html = `
   <form class="dlg settings">
     <div class="dlg-head"><h2>Settings</h2><button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button></div>

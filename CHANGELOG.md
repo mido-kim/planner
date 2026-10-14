@@ -3,6 +3,13 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.2.1 (2026-10-14)
+
+- Design preview: add `?demo` to the address to see the app filled with sample
+  events and tasks (nothing is saved, your calendar isn't touched). Add
+  `&view=day|week|2week|month` or `&show=tasks|event|new-event|delete|task|settings`
+  to open a particular screen. Used for designing in Figma.
+
 ## 0.2.0 (2026-10-14)
 
 - Tentative events: turn on "Tentative" in the event editor. They're drawn with

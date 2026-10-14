@@ -3,7 +3,7 @@ import { firebaseConfig } from './config.js';
 import {
   addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, nowMin, parts, shiftDays, startOfMonth, startOfWeek, today,
 } from './dates.js';
-import { eventEditor, settingsDialog, taskEditor } from './dialogs.js';
+import { askScope, eventEditor, settingsDialog, taskEditor } from './dialogs.js';
 import { icons } from './icons.js';
 import { expand } from './recurrence.js';
 import { deleteOps, isRepeating, masterOf, saveOps } from './series.js';
@@ -32,6 +32,10 @@ const state = {
 let store = null;
 let cloud = null;
 let unsubscribe = null;
+let demo = false; // design preview: sample data, nothing saved
+
+// Display settings are saved per device, except in the design preview.
+const persist = () => !demo && saveSettings(settings);
 let lastRangeKey = '';
 let lastToday = today();
 
@@ -40,6 +44,8 @@ boot();
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   wireEvents();
+  const params = new URLSearchParams(location.search);
+  if (params.has('demo')) return startDemo(params);
   if (!firebaseConfig) return start(localStore());
   showMessage('Loading…');
   try {
@@ -66,6 +72,28 @@ function start(s) {
     if (first && store.kind === 'cloud') setTimeout(offerLocalCopy, 300);
     first = false;
   });
+}
+
+// Design preview: ?demo, optionally with &view=day|week|2week|month and
+// &show=tasks|event|new-event|delete|task|settings to open one part of the UI.
+async function startDemo(params) {
+  demo = true;
+  const { demoStore } = await import('./demo.js');
+  const s = demoStore(settings.weekStart);
+  if (['day', 'week', '2week', 'month'].includes(params.get('view'))) state.view = params.get('view');
+  start(s);
+  const [id, date] = s.samples.repeating;
+  switch (params.get('show')) {
+    case 'tasks':
+      state.sheetOpen = true;
+      render();
+      break;
+    case 'event': editEventAt(id, date); break;
+    case 'new-event': newEventAt(s.samples.newEventDate, 10 * 60, 11 * 60); break;
+    case 'delete': askScope('delete'); break;
+    case 'task': editTask(s.samples.task); break;
+    case 'settings': openSettings(); break;
+  }
 }
 
 function showMessage(text) {
@@ -193,7 +221,7 @@ function renderCalendar(r, rangeChanged) {
   cal.innerHTML = renderTimeGrid({ days: r.days, occs: occurrencesIn(r.from, r.to), settings });
   const tg = cal.querySelector('.tg');
   if (prev) tg.scrollTop = prev.top;
-  else {
+  else if (!demo) {
     // First time: bring the current time into view.
     const n = nowMin();
     const H0 = settings.dayStart * 60;
@@ -308,14 +336,14 @@ function move(dir) {
 function setView(view) {
   state.view = view;
   settings.view = view;
-  saveSettings(settings);
+  persist();
   render();
 }
 
 function toggleTasks() {
   if (innerWidth >= WIDE) {
     settings.hideTasks = !settings.hideTasks;
-    saveSettings(settings);
+    persist();
   } else state.sheetOpen = !state.sheetOpen;
   render();
 }
@@ -516,6 +544,7 @@ function toast(message, undo) {
 
 function updateBanner() {
   const banner = $('#banner');
+  if (demo) return void (banner.hidden = true);
   const meta = readJSON(BACKUP_KEY, {});
   if (!meta.firstSeen) writeJSON(BACKUP_KEY, { ...meta, firstSeen: Date.now() });
   const since = meta.last || meta.firstSeen || Date.now();
@@ -542,7 +571,7 @@ function openSettings() {
     onChange: (changes) => {
       settings = { ...settings, ...changes };
       if (settings.dayEnd <= settings.dayStart) settings.dayEnd = Math.min(24, settings.dayStart + 1);
-      saveSettings(settings);
+      persist();
       render();
     },
     actions: {
