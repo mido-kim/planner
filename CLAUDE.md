@@ -37,9 +37,11 @@ the source of truth for design values: each one's WEB code syntax names the
 CSS custom property it maps to (`var(--bg)`, `var(--hh)`, `var(--radius-event)`,
 `var(--ink-blue)`, …). Use those exact names in `css/app.css`; some don't exist
 in the CSS yet. Figma gotchas met so far: SF Pro can't be used for instance
-text (styles use Inter), and paint opacity on variable-bound fills resets
-inside frames with explicit variable modes, so tints are separate layers with
-layer opacity.
+text, and Arial isn't available to the Figma connector, so text styles use
+Arimo (Arial's metrics); paint opacity on variable-bound fills resets inside
+frames with explicit variable modes, so tints are separate layers with layer
+opacity. The screens were redrawn by script at 30px an hour; event positions
+there are set by hand, not from data.
 
 ## Data
 

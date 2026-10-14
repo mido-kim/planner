@@ -9,12 +9,15 @@ touch the code.
 **[Planner design](https://www.figma.com/design/52orOIzQZKKVSt9EeObl2X)**, in the MyTeam team.
 
 - **Screens page:** Phone · Week, PC · Week (with the task panel) and
-  Phone · Event editor, rebuilt from the real app as editable layers, plus a
-  "Start here" note.
+  Phone · Event editor, rebuilt from the real app as editable layers at 30px an
+  hour, plus a "Start here" note.
 - **Components page:** every building block with its states: icons, Button,
   Icon button, Badge, View switcher, Day header, Switch, Weekday button, Color
-  swatch, Text field, Select, Event block (Normal / Short / Tentative × 9
-  colors), All-day chip, Month event, Task row, Task group header, Now line.
+  swatch, Text field, Select, Label pill, New buttons, Create menu, Event
+  block (Normal / Short / Tentative × 9 colors), Event bar (Block / Arrows /
+  Line × 9 colors), Deadline line, Deadline chip, Calendar task, Month task,
+  All-day chip (out-of-hours), Month event, Task row, Task group header, Now
+  line.
 - **Variables** (right panel → Local variables):
   - *Color*: Light and Dark modes. Each variable is named after the app
     setting it controls, and its code name is in the variable details
@@ -22,8 +25,9 @@ touch the code.
     the text color on each event color.
   - *Size*: PC and Phone modes (`layout/hour-height` = how tall an hour is,
     `layout/hour-column-width`, `radius/event`, …).
-- **Text styles** use Arial, like the app (Korean text falls back to Apple SD
-  Gothic Neo on iPhone and Malgun Gothic on Windows).
+- **Text styles** use Arimo, a free font with exactly Arial's letter widths
+  (Figma's connector can't use Arial itself). The app uses Arial, with Apple SD
+  Gothic Neo (iPhone) or Malgun Gothic (Windows) for Korean.
 
 Month view, the task sheet and the settings screen aren't rebuilt yet. Ask
 Claude to add any screen you want to redesign.
