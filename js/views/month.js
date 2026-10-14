@@ -5,14 +5,14 @@ import { spanDays, WEEKDAYS_SHORT } from '../recurrence.js';
 import { esc } from '../util.js';
 import { barHtml, layoutBars } from './bars.js';
 
-// Month and 2-week views: a grid of days. All-day events and events that run
+// Month view: a grid of days. All-day events and events that run
 // into another day are bars across their days; under them, each day lists its
 // other events, deadlines and tasks in time order, with date-only tasks last.
 // Clicking a date opens that day on the timeline.
 //
 // `rows` is how many item rows fit under the date in a cell.
 
-export function renderMonth({ range, occs, tasks = [], labels = new Map(), settings, rows, firstLabel = false }) {
+export function renderMonth({ range, occs, tasks = [], labels = new Map(), settings, rows }) {
   const t = today();
   const h24 = settings.h24;
   const color = (item, fallback) => colorOf(item, labels, fallback);
@@ -60,7 +60,7 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
         d === t && 'today',
         (weekday(d) === 0 || weekday(d) === 6) && 'wkend',
       ].filter(Boolean).join(' ');
-      const label = dayNum === 1 || (firstLabel && w === 0 && i === 0) ? fmt(d, { month: 'short', day: 'numeric' }) : dayNum;
+      const label = dayNum === 1 ? fmt(d, { month: 'short', day: 'numeric' }) : dayNum;
       return `<div class="${cls}" data-date="${d}">
         <div class="mv-num"><span role="button" tabindex="0" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}">${label}</span></div>
         ${top ? `<div class="mv-lanes" style="height:calc(${top} * var(--mrow) - 1px)"></div>` : ''}
@@ -76,7 +76,7 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
     weeks.push(`<div class="mv-week">${cells.join('')}${barsHtml.join('')}</div>`);
   }
 
-  return `<div class="mv${range.weeks === 2 ? ' two' : ''}" style="--weeks:${range.weeks}"><div class="mv-head">${head}</div>${weeks.join('')}</div>`;
+  return `<div class="mv" style="--weeks:${range.weeks}"><div class="mv-head">${head}</div>${weeks.join('')}</div>`;
 }
 
 // By time; at the same time events, then deadlines, then tasks.

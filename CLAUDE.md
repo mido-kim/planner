@@ -10,10 +10,16 @@ and setup, CHANGELOG.md for history.
 - `js/main.js`: startup, layout shell, `render()`, navigation, input (clicks,
   click/drag-to-create with the create menu, touch long-press, keyboard),
   toasts, label actions, settings/backup actions, sign-in screen.
-- `js/views/timegrid.js` (day/week timeline, with deadlines as lines and
-  tasks as chips), `js/views/month.js` (month and 2-week grids),
-  `js/views/bars.js` (lanes for all-day/multi-day bars and their shapes),
-  `js/views/tasks.js`: each returns an HTML string; `main.js` puts it in place.
+- `js/views/timegrid.js` (day/week timeline in px, and the 2-week view as
+  two squeezed timelines in %; deadlines as lines, tasks as chips),
+  `js/views/month.js` (month grid), `js/views/bars.js` (lanes for
+  all-day/multi-day bars and their shapes), `js/views/agenda.js` (the agenda
+  panel: every item with full details): each returns an HTML string;
+  `main.js` puts it in place.
+- Layout (main.js `applyLayout`): the agenda is `.lay-right` / `.lay-bottom`
+  on a PC (`settings.panelDock`, resizable by `#splitter`), `.lay-bottom` on
+  narrow screens (the lower part), `.lay-sheet` for the month view on narrow
+  screens.
 - `js/labels.js`: label colors, usage, retire and delete (as write ops).
 - `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
   label picker), scope dialog, task editor, labels manager, create menu,
@@ -26,6 +32,10 @@ and setup, CHANGELOG.md for history.
 - `js/dates.js`: all date math on 'YYYY-MM-DD' / 'YYYY-MM-DDTHH:mm' strings
   via UTC. Never use local `Date` arithmetic elsewhere.
 - `css/app.css`: tokens on `:root` (light + dark), then sections per area.
+  Colors are the "Gelato Days" pastels: each item color class sets `--c`
+  (pastel), `--ci` (ink for text), `--cl` (mid tone for lines and dots) and
+  `--cf` (block fill). The accent is pink (`--accent`, `--accent-strong`,
+  `--accent-ink`).
 - `sw.js`: offline cache. **Add any new file to `SHELL`.**
 - `js/demo.js`: design preview (`?demo`), in-memory sample data. DESIGN.md has
   the Figma workflow, layer names and the URL options.

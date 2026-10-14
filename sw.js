@@ -26,7 +26,7 @@ const SHELL = [
   'js/version.js',
   'js/views/month.js',
   'js/views/bars.js',
-  'js/views/tasks.js',
+  'js/views/agenda.js',
   'js/views/timegrid.js',
   'icons/icon.svg',
   'icons/icon-180.png',

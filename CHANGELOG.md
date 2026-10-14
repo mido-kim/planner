@@ -3,6 +3,25 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.4.0 (2026-10-14)
+
+- New "Gelato Days" colors: soft pastel pink, green, yellow, blue, purple and
+  peach (plus matching mint, coral and stone) for events, labels and the app
+  itself, with pink as the main color. Your items keep their colors, in the new
+  shades.
+- The task list is now the Agenda: every event, deadline and task in the
+  dates on screen with its full details (time, label, how it repeats,
+  tentative, notes), plus overdue tasks and tasks with no date.
+- On a PC the agenda can sit at the right or at the bottom (button in its
+  header), can be resized by dragging its edge (double-click to reset), and
+  hidden with × or the agenda button at the top.
+- On a phone, the Day, Week and 2-week views show the calendar in the top half
+  and the agenda in the bottom half. Drag the bar between them to change the
+  split; the agenda button hides it. Month keeps the whole screen, with the
+  agenda as a sheet.
+- The 2-week view shows two short timelines (one per week), so items sit at
+  their times and both weeks fit on screen. Click or drag on them to create.
+
 ## 0.3.0 (2026-10-14)
 
 - Deadlines: a single date and time, drawn as a line across the day with its

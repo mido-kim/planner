@@ -3,6 +3,7 @@ import { addDays, diffDays, fmtTimeRange, weekday } from '../js/dates.js';
 import { activeLabels, colorOf, deleteLabelOps, labelUsage, retiredLabels, setLabelStatusOps } from '../js/labels.js';
 import { alignStart, describeRule, expand, occurrenceDates, toRRule } from '../js/recurrence.js';
 import { deleteOps, saveOps } from '../js/series.js';
+import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
 import { isBarEvent, placeAt, taskPlace } from '../js/views/timegrid.js';
 
@@ -287,6 +288,32 @@ test('backup: holds labels, and older backups without them still restore', () =>
 });
 test('.ics export names the label as a category', () => {
   if (!icsFile(map(ev({ labelId: 'L1' })), labels).includes('CATEGORIES:Research')) throw new Error('missing CATEGORIES');
+});
+
+// ---- agenda
+test('agenda: overdue first, then each day in time order, date-only tasks last, then undated', () => {
+  const evs = [
+    ev({ id: 'trip', allDay: true, start: '2026-10-13', end: '2026-10-14', title: 'Trip' }),
+    ev({ id: 'late', start: '2026-10-12T22:00', end: '2026-10-13T01:00', title: 'Late' }), // started before the range
+    ev({ id: 'meet', start: '2026-10-14T09:00', end: '2026-10-14T10:00', title: 'Meet' }),
+    { ...deadline, id: 'due', start: '2026-10-14T08:00', end: '2026-10-14T08:00', title: 'Due' },
+  ];
+  const occs = evs.flatMap((e) => expand(e, '2026-10-13', '2026-10-15'));
+  const tasks = [
+    { id: 'old', title: 'Old', due: '2026-10-01', done: false },
+    { id: 'any', title: 'Any time', due: '2026-10-14', dueTime: null, done: false },
+    { id: 'nine', title: 'At nine', due: '2026-10-14', dueTime: '09:00', done: false },
+    { id: 'gone', title: 'Done', due: '2026-10-14', done: true },
+    { id: 'free', title: 'Someday', due: null, done: false },
+  ];
+  const { groups, hiddenDone } = agendaGroups({ from: '2026-10-13', to: '2026-10-15', occs, tasks, showDone: false, t: '2026-10-14' });
+  const ids = (g) => g.items.map((x) => (x.occ ? x.occ.ev.id : x.task.id));
+  eq(groups.map((g) => g.kind + (g.day ? ' ' + g.day : '')), ['overdue', 'day 2026-10-13', 'day 2026-10-14', 'nodate']);
+  eq(ids(groups[0]), ['old']);
+  eq(ids(groups[1]), ['trip', 'late']);
+  eq(ids(groups[2]), ['trip', 'due', 'meet', 'nine', 'any']);
+  eq(ids(groups[3]), ['free']);
+  eq(hiddenDone, 1);
 });
 
 // ---- report

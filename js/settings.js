@@ -10,6 +10,15 @@ export const DEFAULTS = {
   h24: false,
   hourHeight: 30, // pixels per hour
   view: 'week',
+  // The agenda panel. On a PC it sits at the right or the bottom, and can be
+  // hidden; on a phone it fills the bottom part of the screen (except in the
+  // month view, where it comes up as a sheet).
+  panelDock: 'right', // 'right' | 'bottom'
+  panelW: 320, // width at the right, in pixels
+  panelH: 0.4, // height at the bottom on a PC, as a share of the space
+  splitH: 0.5, // height at the bottom on a phone
+  hideTasks: false, // hidden on a PC
+  hideSplit: false, // hidden on a phone
 };
 
 export const HOUR_HEIGHTS = [30, 40, 52, 68];

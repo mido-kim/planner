@@ -5,7 +5,8 @@ an app on a PC (Chrome) and an iPhone (Safari).
 
 - **Day, Week, 2 Weeks and Month views.** In Day and Week, events sit on a
   timeline at their start time and are as tall as they are long. Overlapping
-  events share the column. 2 Weeks and Month are grids of days.
+  events share the column. 2 Weeks shows two short timelines, one per week.
+  Month is a grid of days.
 - **Events, deadlines and tasks.** Click or drag on the calendar (on a phone:
   tap, or hold and drag) and pick what to make, or use the three buttons at the
   top. A deadline is a single moment, drawn as a line across its day.
@@ -18,9 +19,12 @@ an app on a PC (Chrome) and an iPhone (Safari).
   months or years. A repeat can end never, on a date, or after N times.
 - **Edit or delete** one occurrence, this and following, or all events, with
   Undo after deleting.
-- **Tasks** beside the calendar, showing what's due in the dates on screen,
-  plus overdue tasks and tasks with no date. Tasks with a date also show on
-  the calendar, with a tick box.
+- **Agenda** with the full details of every event, deadline and task in the
+  dates on screen, plus overdue tasks and tasks with no date. On a PC it sits
+  at the right or the bottom (drag its edge to resize, or hide it); on a phone
+  it fills the lower half of the screen. Tasks with a date also show on the
+  calendar, with a tick box.
+- **Gelato colors:** soft pastel colors throughout, in light and dark mode.
 - **Works offline.** Optional sync between devices through Firebase.
 - **Your data stays portable:** JSON backups that restore into this app, and
   `.ics` export that opens in Google Calendar, Apple Calendar and Outlook.
@@ -116,9 +120,9 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 |---|---|
 | `index.html`, `css/app.css` | Page and styles (light and dark) |
 | `js/main.js` | App startup, layout, navigation and input |
-| `js/views/timegrid.js` | Day / week / 2-week timeline |
+| `js/views/timegrid.js` | Day / week timeline and the 2-week view |
 | `js/views/month.js` | Month grid |
-| `js/views/tasks.js` | Task list |
+| `js/views/agenda.js` | Agenda (events, deadlines and tasks with details) |
 | `js/dialogs.js` | Event, task, repeat-scope and settings dialogs |
 | `js/recurrence.js` | Repeat rules: occurrence dates, descriptions, iCalendar RRULE |
 | `js/series.js` | "This / this and following / all" edits and deletes |

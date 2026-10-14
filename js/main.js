@@ -12,12 +12,12 @@ import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
 import { $, esc, readJSON, uid, writeJSON } from './util.js';
 import { renderMonth } from './views/month.js';
-import { renderTaskList, tasksInView } from './views/tasks.js';
-import { renderTimeGrid } from './views/timegrid.js';
+import { renderAgenda, tasksInView } from './views/agenda.js';
+import { renderTimeGrid, renderTwoWeeks } from './views/timegrid.js';
 
 const DAY_MS = 86400000;
 const BACKUP_KEY = 'planner.backup.v1'; // { last, snoozeUntil, firstSeen } for this device
-const WIDE = 900; // at this width and up, the task list sits beside the calendar
+const WIDE = 900; // at this width and up, the agenda can sit beside the calendar
 const DEADLINE_TIME = 23 * 60 + 59; // a new deadline without a picked time is due at 11:59 PM
 const LONG_PRESS_MS = 450; // on touch screens, hold this long to start selecting
 
@@ -30,7 +30,7 @@ const state = {
   tasks: new Map(),
   labels: new Map(),
   pending: false,
-  sheetOpen: false, // task list on narrow screens
+  sheetOpen: false, // agenda over the month view on narrow screens
   showDone: false,
 };
 let store = null;
@@ -38,6 +38,7 @@ let cloud = null;
 let unsubscribe = null;
 let demo = false; // design preview: sample data, nothing saved
 let refreshOpenDialog = null; // redraws an open labels dialog when data changes
+let calObserver = null; // redraws the month grid when its space changes
 
 // Display settings are saved per device, except in the design preview.
 const persist = () => !demo && saveSettings(settings);
@@ -128,7 +129,7 @@ function renderShell() {
     <div class="seg" role="group" aria-label="View">
       <button data-view="day">Day</button><button data-view="week">Week</button><button data-view="2week" aria-label="2 weeks"><span class="lg">2 Weeks</span><span class="sm">2 Wk</span></button><button data-view="month">Month</button>
     </div>
-    <button class="icon-btn tasks-btn" data-action="toggle-tasks" aria-label="Tasks">${icons.tasks}<span class="badge" id="task-badge" hidden></span></button>
+    <button class="icon-btn tasks-btn" data-action="toggle-tasks" aria-label="Agenda" title="Show or hide the agenda">${icons.tasks}<span class="badge" id="task-badge" hidden></span></button>
     <button class="icon-btn settings-btn" data-action="settings" aria-label="Settings">${icons.settings}<span class="sync-dot" id="sync-dot" hidden></span></button>
     <div class="new-group" role="group" aria-label="New">
       <button class="nb" data-action="new-event" title="New event (N)" aria-label="New event">${icons.event}<span>Event</span></button>
@@ -136,13 +137,15 @@ function renderShell() {
       <button class="nb" data-action="new-task" title="New task" aria-label="New task">${icons.task}<span>Task</span></button>
     </div>
   </header>
-  <div class="main">
+  <div class="main" id="main">
     <section class="cal" id="cal"></section>
+    <div class="splitter" id="splitter" role="separator" tabindex="0" aria-label="Resize the agenda" title="Drag to resize · double-click to reset"></div>
     <div class="scrim" data-action="toggle-tasks"></div>
-    <aside class="tasks" id="tasks" aria-label="Tasks">
+    <aside class="tasks" id="tasks" aria-label="Agenda">
       <div class="tasks-head">
-        <div><h2>Tasks</h2><p class="sub" id="tasks-range"></p></div>
-        <button class="icon-btn tasks-close" data-action="toggle-tasks" aria-label="Close tasks">${icons.close}</button>
+        <div><h2>Agenda</h2><p class="sub" id="tasks-range"></p></div>
+        <button class="icon-btn dock-btn" data-action="dock" id="dock-btn"></button>
+        <button class="icon-btn tasks-close" data-action="toggle-tasks" aria-label="Hide the agenda" title="Hide the agenda">${icons.close}</button>
       </div>
       <form class="task-add" id="task-add" autocomplete="off">
         <input name="title" placeholder="Add a task" enterkeyhint="done" maxlength="200" aria-label="New task">
@@ -153,10 +156,12 @@ function renderShell() {
     </aside>
   </div>
   <div class="banner" id="banner" hidden></div>`;
+  calObserver?.disconnect();
+  calObserver?.observe($('#cal'));
 }
 
-// Month and 2-week views are grids of days; day and week are timelines.
-const isGrid = () => state.view === 'month' || state.view === '2week';
+// The month view is a grid of days; the others are timelines.
+const isGrid = () => state.view === 'month';
 
 function viewRange() {
   const d = state.date;
@@ -166,7 +171,7 @@ function viewRange() {
       return { from: d, to: addDays(d, 1), days: [d] };
     case '2week': {
       const s = startOfWeek(d, ws);
-      return { from: s, to: addDays(s, 14), gridFrom: s, gridTo: addDays(s, 14), weeks: 2 };
+      return { from: s, to: addDays(s, 14), days: daysFrom(s, 14) };
     }
     case 'month': {
       const s = startOfMonth(d);
@@ -215,17 +220,17 @@ function render() {
   $('#range-title').textContent = rangeTitle(r);
   $('#jump').value = state.date;
   app.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.view === state.view));
-  app.classList.toggle('sheet-open', state.sheetOpen);
-  app.classList.toggle('tasks-hidden', !!settings.hideTasks);
-  renderCalendar(r, rangeChanged);
-  renderTasks(r, rangeChanged);
+  applyLayout();
+  const occs = occurrencesIn(isGrid() ? r.gridFrom : r.from, isGrid() ? r.gridTo : r.to);
+  renderCalendar(r, rangeChanged, occs);
+  renderTasks(r, rangeChanged, isGrid() ? undefined : occs);
   const dot = $('#sync-dot');
   dot.hidden = !(store.kind === 'cloud' && (state.pending || !navigator.onLine));
   dot.title = navigator.onLine ? 'Syncing…' : 'Offline — changes will sync later';
   updateBanner();
 }
 
-function renderCalendar(r, rangeChanged) {
+function renderCalendar(r, rangeChanged, occs) {
   const cal = $('#cal');
   const old = cal.querySelector('.tg');
   const prev = old ? { top: old.scrollTop, left: old.scrollLeft } : null;
@@ -236,12 +241,16 @@ function renderCalendar(r, rangeChanged) {
     const cellH = ((cal.clientHeight || 600) - 28) / r.weeks;
     const rows = Math.max(1, Math.floor((cellH - (phone ? 29 : 30)) / (phone ? 17 : 19)));
     cal.innerHTML = renderMonth({
-      range: r, occs: occurrencesIn(r.gridFrom, r.gridTo), tasks: tasksIn(r.gridFrom, r.gridTo), labels: state.labels, settings, rows, firstLabel: state.view === '2week',
+      range: r, occs: occs || occurrencesIn(r.gridFrom, r.gridTo), tasks: tasksIn(r.gridFrom, r.gridTo), labels: state.labels, settings, rows,
     });
     return;
   }
+  if (state.view === '2week') {
+    cal.innerHTML = renderTwoWeeks({ days: r.days, occs: occs || occurrencesIn(r.from, r.to), tasks: tasksIn(r.from, r.to), labels: state.labels, settings });
+    return;
+  }
 
-  cal.innerHTML = renderTimeGrid({ days: r.days, occs: occurrencesIn(r.from, r.to), tasks: tasksIn(r.from, r.to), labels: state.labels, settings });
+  cal.innerHTML = renderTimeGrid({ days: r.days, occs: occs || occurrencesIn(r.from, r.to), tasks: tasksIn(r.from, r.to), labels: state.labels, settings });
   const tg = cal.querySelector('.tg');
   if (prev) tg.scrollTop = prev.top;
   else if (!demo) {
@@ -262,12 +271,14 @@ function renderCalendar(r, rangeChanged) {
   }
 }
 
-function renderTasks(r, rangeChanged) {
+function renderTasks(r, rangeChanged, occs = occurrencesIn(r.from, r.to)) {
   $('#tasks-range').textContent =
     state.view === 'month' ? fmt(r.from, { month: 'long', year: 'numeric' })
       : state.view === 'day' ? fmt(r.from, { weekday: 'long', month: 'short', day: 'numeric' })
         : spanLabel(r.from, addDays(r.to, -1));
-  $('#task-list').innerHTML = renderTaskList({ tasks: state.tasks, from: r.from, to: r.to, h24: settings.h24, showDone: state.showDone, labels: state.labels });
+  $('#task-list').innerHTML = renderAgenda({
+    from: r.from, to: r.to, occs, tasks: state.tasks, events: state.events, labels: state.labels, h24: settings.h24, showDone: state.showDone,
+  });
   // New tasks default to today if it's on screen, else the picked day.
   const due = $('#task-add').elements.due;
   if (rangeChanged && document.activeElement !== due) due.value = defaultDay(r);
@@ -415,12 +426,106 @@ function setView(view) {
   render();
 }
 
+// Where the agenda goes: at the right or the bottom on a PC (your choice), at
+// the bottom on a phone, or as a sheet over the month view on a phone.
+function layoutMode() {
+  if (innerWidth >= WIDE) return settings.panelDock === 'bottom' ? 'bottom' : 'right';
+  return isGrid() ? 'sheet' : 'bottom';
+}
+
+function applyLayout() {
+  const mode = layoutMode();
+  const wide = innerWidth >= WIDE;
+  for (const m of ['right', 'bottom', 'sheet']) app.classList.toggle(`lay-${m}`, mode === m);
+  app.classList.toggle('panel-hidden', mode !== 'sheet' && !!(wide ? settings.hideTasks : settings.hideSplit));
+  app.classList.toggle('sheet-open', mode === 'sheet' && state.sheetOpen);
+  const main = $('#main');
+  settings.panelW = Math.round(Math.min(Math.max(settings.panelW, 240), Math.max(240, innerWidth * 0.6)));
+  main.style.setProperty('--panel-w', `${settings.panelW}px`);
+  main.style.setProperty('--panel-h', `${Math.round((wide ? settings.panelH : settings.splitH) * 1000) / 10}%`);
+  const dock = $('#dock-btn');
+  const toBottom = settings.panelDock !== 'bottom';
+  dock.innerHTML = toBottom ? icons.dockBottom : icons.dockRight;
+  dock.setAttribute('aria-label', toBottom ? 'Move the agenda to the bottom' : 'Move the agenda to the right');
+  dock.title = dock.getAttribute('aria-label');
+  return mode;
+}
+
 function toggleTasks() {
-  if (innerWidth >= WIDE) {
-    settings.hideTasks = !settings.hideTasks;
-    persist();
-  } else state.sheetOpen = !state.sheetOpen;
+  const mode = layoutMode();
+  if (mode === 'sheet') state.sheetOpen = !state.sheetOpen;
+  else if (innerWidth >= WIDE) settings.hideTasks = !settings.hideTasks;
+  else settings.hideSplit = !settings.hideSplit;
+  persist();
   render();
+}
+
+function toggleDock() {
+  settings.panelDock = settings.panelDock === 'bottom' ? 'right' : 'bottom';
+  settings.hideTasks = false;
+  persist();
+  render();
+}
+
+// Keeps getting the pointer's moves while it's dragged outside the element.
+function capture(el, pointerId) {
+  try {
+    el.setPointerCapture(pointerId);
+  } catch {
+    // The pointer is already gone; nothing to follow.
+  }
+}
+
+// Dragging the bar between the calendar and the agenda resizes the agenda.
+function wireSplitter() {
+  let drag = null;
+  const size = (e) => {
+    const r = drag.main;
+    if (drag.mode === 'right') settings.panelW = Math.round(Math.min(Math.max(r.right - e.clientX, 240), r.width * 0.6));
+    else {
+      const share = Math.min(Math.max((r.bottom - e.clientY) / r.height, 0.2), 0.8);
+      if (innerWidth >= WIDE) settings.panelH = share;
+      else settings.splitH = share;
+    }
+    applyLayout();
+  };
+  app.addEventListener('pointerdown', (e) => {
+    const bar = e.target.closest('#splitter');
+    if (!bar || e.button !== 0) return;
+    drag = { main: $('#main').getBoundingClientRect(), mode: layoutMode() };
+    capture(bar, e.pointerId);
+    bar.classList.add('dragging');
+    e.preventDefault();
+  });
+  app.addEventListener('pointermove', (e) => drag && size(e));
+  const end = () => {
+    if (!drag) return;
+    drag = null;
+    $('#splitter')?.classList.remove('dragging');
+    persist();
+  };
+  app.addEventListener('pointerup', end);
+  app.addEventListener('pointercancel', end);
+  app.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('#splitter')) return;
+    if (layoutMode() === 'right') settings.panelW = 320;
+    else if (innerWidth >= WIDE) settings.panelH = 0.4;
+    else settings.splitH = 0.5;
+    persist();
+    applyLayout();
+  });
+  app.addEventListener('keydown', (e) => {
+    if (!e.target.closest('#splitter')) return;
+    const mode = layoutMode();
+    const grow = { right: { ArrowLeft: 1, ArrowRight: -1 }, bottom: { ArrowUp: 1, ArrowDown: -1 } }[mode]?.[e.key];
+    if (!grow) return;
+    e.preventDefault();
+    if (mode === 'right') settings.panelW += grow * 20;
+    else if (innerWidth >= WIDE) settings.panelH = Math.min(0.8, Math.max(0.2, settings.panelH + grow * 0.05));
+    else settings.splitH = Math.min(0.8, Math.max(0.2, settings.splitH + grow * 0.05));
+    persist();
+    applyLayout();
+  });
 }
 
 const actions = {
@@ -431,6 +536,7 @@ const actions = {
   prev: () => move(-1),
   next: () => move(1),
   'toggle-tasks': toggleTasks,
+  dock: toggleDock,
   'new-event': () => newEvent(state.date),
   'new-deadline': () => newDeadline(defaultDay()),
   'new-task': () => newTask(defaultDay()),
@@ -459,12 +565,16 @@ let mouseDown = false;
 let press = null; // a touch that may become a selection
 
 const ITEMS = '.ev, .dl, .tchip, .bar, .chip, .mchip, [data-goto], input, button, a';
-const surfaceAt = (target) => (target.closest(ITEMS) ? null : target.closest('.tg-col, .mv-cell, .ad-day'));
+const surfaceAt = (target) => (target.closest(ITEMS) ? null : target.closest('.tg-col, .tw-col, .mv-cell, .ad-day'));
+const isTimeColumn = (el) => el.classList.contains('tg-col') || el.classList.contains('tw-col');
 
+// The time at height y in a day column (whose top is the day's first hour
+// and bottom its last).
 function minuteAt(col, y) {
   const r = col.getBoundingClientRect();
-  const m = settings.dayStart * 60 + ((y - r.top) * 60) / settings.hourHeight;
-  return Math.min(settings.dayEnd * 60, Math.max(settings.dayStart * 60, m));
+  const H0 = settings.dayStart * 60;
+  const H1 = settings.dayEnd * 60;
+  return Math.min(H1, Math.max(H0, H0 + ((y - r.top) / r.height) * (H1 - H0)));
 }
 
 // The range shown, on 15-minute steps, at least 15 minutes long.
@@ -476,18 +586,19 @@ function drawGhost(s) {
     s.ghost.className = 'ghost';
     s.col.append(s.ghost);
   }
-  const ppm = settings.hourHeight / 60;
-  s.ghost.style.top = `${(a - settings.dayStart * 60) * ppm}px`;
-  s.ghost.style.height = `${(b - a) * ppm}px`;
+  const span = (settings.dayEnd - settings.dayStart) * 60;
+  s.ghost.style.top = `${((a - settings.dayStart * 60) / span) * 100}%`;
+  s.ghost.style.height = `${((b - a) / span) * 100}%`;
   return [a, b];
 }
 
 // The day cell under a point, among cells like `like` (same kind of cell).
 function dayAt(like, x, y) {
-  const kind = like.classList.contains('ad-day') ? '.ad-day' : '.mv-cell';
-  for (const c of app.querySelectorAll(kind)) {
+  const strip = like.classList.contains('ad-day');
+  // In an all-day row, only that row's days, by x alone.
+  for (const c of (strip ? like.parentNode : app).querySelectorAll(strip ? '.ad-day' : '.mv-cell')) {
     const r = c.getBoundingClientRect();
-    if (x >= r.left && x < r.right && (kind === '.ad-day' || (y >= r.top && y < r.bottom))) return c;
+    if (x >= r.left && x < r.right && (strip || (y >= r.top && y < r.bottom))) return c;
   }
   return null;
 }
@@ -497,7 +608,7 @@ function markDays() {
 }
 
 function beginSelection(surface, x, y) {
-  if (surface.classList.contains('tg-col')) {
+  if (isTimeColumn(surface)) {
     const m = minuteAt(surface, y);
     sel = { type: 'time', col: surface, date: surface.dataset.date, start: m, end: m, moved: false, x, y };
   } else {
@@ -535,7 +646,7 @@ let scrollTimer = 0;
 let lastPoint = null;
 function autoScroll(x, y) {
   lastPoint = [x, y];
-  if (scrollTimer || sel?.type !== 'time') return;
+  if (scrollTimer || sel?.type !== 'time' || !sel.col.closest('.tg')) return;
   const step = () => {
     scrollTimer = 0;
     const tg = $('.tg');
@@ -619,7 +730,7 @@ function wireGestures() {
     if (!surface) return;
     beginSelection(surface, e.clientX, e.clientY);
     mouseDown = true;
-    surface.setPointerCapture(e.pointerId);
+    capture(surface, e.pointerId);
     e.preventDefault();
   });
   app.addEventListener('pointermove', (e) => {
@@ -748,6 +859,7 @@ function wireEvents() {
   });
 
   wireGestures();
+  wireSplitter();
 
   document.addEventListener('keydown', (e) => {
     if (!store || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open], .cm-scrim')) return;
@@ -763,17 +875,21 @@ function wireEvents() {
     }
   });
 
-  let lastW = innerWidth;
   let resizeTimer;
   addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      if (!store || sel) return;
-      const r = viewRange();
-      $('#range-title').textContent = rangeTitle(r);
-      if (isGrid() || innerWidth !== lastW) renderCalendar(r, false);
-      lastW = innerWidth;
-    }, 150);
+    resizeTimer = setTimeout(() => store && !sel && render(), 150);
+  });
+  // The month grid fits as many items as there's room for, so it's redrawn
+  // when its space changes (window size, or the agenda being resized).
+  let lastCal = '';
+  let calTimer;
+  calObserver = new ResizeObserver(([entry]) => {
+    const key = `${Math.round(entry.contentRect.width)}x${Math.round(entry.contentRect.height)}`;
+    if (key === lastCal) return;
+    lastCal = key;
+    clearTimeout(calTimer);
+    calTimer = setTimeout(() => store && !sel && isGrid() && renderCalendar(viewRange(), false), 60);
   });
 
   // Keep "now" and "today" current.

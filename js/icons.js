@@ -20,5 +20,7 @@ export const icons = {
   event: svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M12 10.5v7M8.5 14h7"/>', 16),
   task: svg('<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>', 16),
   pencil: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>', 16),
+  dockRight: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16"/>', 18),
+  dockBottom: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 13h18"/>', 18),
   tag: svg('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>', 16),
 };

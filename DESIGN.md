@@ -94,7 +94,7 @@ each layer is:
 | Events | `Event block` (variants: Normal / Short / Tentative / Continues), `Event bar` (Block / Arrows / Line), `Outside-hours chip` |
 | Deadlines and tasks | `Deadline line`, `Deadline chip`, `Calendar task` (Open / Done), `Month task` |
 | Month and 2 weeks | `Month cell` (variants: Today / Other month / Weekend), `Month event` (Timed / Tentative), `More link` |
-| Tasks | `Tasks panel`, `Task add field`, `Task group header` (Today / Overdue / Other), `Task row` (Open / Done / Overdue) |
+| Agenda | `Agenda panel` (Right / Bottom), `Splitter`, `Task add field`, `Agenda day header` (Today / Overdue / Other), `Agenda card` (Event / Deadline / Task / Tentative / Done) |
 | Labels | `Label pill` (Off / On / Retired), `Label row` (Active / Retired) |
 | Dialogs | `Event editor`, `Repeat options`, `Scope dialog`, `Task editor`, `Labels`, `Create menu`, `Settings`, `Switch`, `Weekday button`, `Color swatch` |
 
@@ -112,14 +112,15 @@ dark-mode block.
 | Hour column | 56px wide (42 phone); labels 10.5px |
 | Hour height | 30px (40, 52 and 68 in Settings) |
 | Grid lines | hour: 1px line color; half-hour: 1px softer line |
-| Event block | 6px corners, 17% color tint, no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
-| Tentative event | 6% tint, 1.5px dashed outline |
+| Event block | 6px corners, solid pastel fill with its dark ink for text (dark mode: 30% of the pastel, pastel text), no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
+| Tentative event | 30% of the pastel, 1.5px dashed outline |
+| 2-week view | Two week rows; 30px day header, all-day strip (16px bars), then a timeline squeezed to fit; labels every 3 hours; blocks show the title only |
 | Event bar (all-day row) | 20px tall (18 in month, 16 phone), 5px corners, 11.5px text; Block = solid color, Arrows/Line = 2px line with the title in the middle, 8 × 10px arrowheads |
 | Deadline | 2px line across the day; title tag 16px tall, 10.5px bold white text on the color, 4px corners (square where it meets the line) |
 | Calendar task | 18px tall, 5px corners, 1px color outline, 12px tick box, 11px text |
 | Now line | 2px red, 10px dot |
 | Month cell | date 12.5px in a 24px circle; events 18px tall, 11.5px text; "+N more" |
-| Tasks panel | 300px wide (phone: sheet from the bottom, 75% of screen); title 16px; group headers 11.5px uppercase; 18px checkboxes |
+| Agenda panel | PC: 320px wide at the right (240–60% of the window, drag to resize) or 40% high at the bottom; phone: the lower 50% (20–80%), a sheet over the month view. Cards: 12px corners, 60% of the item's pastel, title 14px bold, time 12.5px in its ink, label and repeat 12px, notes 13px |
 | Dialogs | 480px wide, 14px corners (phone: full-width sheet, 16px top corners); title field 19px semibold; rows 34px; switch 40 × 24 |
 | Color swatches | 22px circles, ring when selected |
 
@@ -129,7 +130,7 @@ Add these to `https://mido-kim.github.io/planner/?demo` (or
 `http://localhost:5173/?demo` when running locally):
 
 - `&view=day`, `&view=week`, `&view=2week`, `&view=month`
-- `&show=tasks` (task sheet on phone), `&show=event` (editor with repeat
+- `&show=tasks` (agenda sheet over the month view on a phone), `&show=event` (editor with repeat
   options), `&show=deadline`, `&show=new-event`, `&show=create` (the
   event / deadline / task menu), `&show=delete` (this/following/all),
   `&show=task`, `&show=labels`, `&show=settings`
