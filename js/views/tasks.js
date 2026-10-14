@@ -1,4 +1,5 @@
 import { addDays, fmt, fmtTime, parseTime, today } from '../dates.js';
+import { colorOf } from '../labels.js';
 import { esc } from '../util.js';
 
 // The task list beside the calendar: tasks due in the dates on screen, grouped
@@ -14,7 +15,7 @@ export function tasksInView(tasks, from, to) {
     x.due ? (x.due >= from && x.due < to) || (showOverdue && !x.done && x.due < from) : !x.done);
 }
 
-export function renderTaskList({ tasks, from, to, h24, showDone }) {
+export function renderTaskList({ tasks, from, to, h24, showDone, labels = new Map() }) {
   const t = today();
   const all = [...tasks.values()];
   const groups = [];
@@ -47,9 +48,12 @@ export function renderTaskList({ tasks, from, to, h24, showDone }) {
         g.showDate ? fmt(x.due, { month: 'short', day: 'numeric' }) : late && 'Overdue',
         x.dueTime && fmtTime(parseTime(x.dueTime), h24),
       ].filter(Boolean).join(' · ');
+      const color = colorOf(x, labels, null);
+      const label = x.labelId && labels.get(x.labelId);
+      const tag = color ? `<span class="task-label c-${color}"><i></i>${label ? esc(label.name) : ''}</span>` : '';
       return `<div class="task${x.done ? ' done' : ''}${late ? ' late' : ''}">
         <input type="checkbox" data-toggle="${esc(x.id)}" ${x.done ? 'checked' : ''} aria-label="Done">
-        <button class="task-title" data-edit-task="${esc(x.id)}"><span>${esc(x.title)}</span>${meta ? `<span class="task-meta">${meta}</span>` : ''}${x.notes ? '<span class="task-note-dot" title="Has notes"></span>' : ''}</button>
+        <button class="task-title" data-edit-task="${esc(x.id)}"><span>${esc(x.title)}</span>${meta ? `<span class="task-meta">${meta}</span>` : ''}${tag}${x.notes ? '<span class="task-note-dot" title="Has notes"></span>' : ''}</button>
       </div>`;
     }).join('');
 

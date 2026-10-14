@@ -1,23 +1,66 @@
-import { absMin, fmt, fmtTime, fmtTimeRange, minOf, nowMin, pad, parts, today, weekday } from '../dates.js';
+import { absMin, addDays, fmt, fmtTime, fmtTimeRange, minOf, nowMin, pad, parseTime, parts, today, weekday } from '../dates.js';
 import { icons } from '../icons.js';
+import { colorOf } from '../labels.js';
+import { spanDays } from '../recurrence.js';
 import { esc } from '../util.js';
+import { barHtml, layoutBars } from './bars.js';
 
-// Day, week and two-week views: days side by side on a timeline, where each
-// event sits at its start time and is as tall as it is long. Events that
-// overlap share the width of the column.
+// Day and week views: days side by side on a timeline, where each event sits
+// at its start time and is as tall as it is long. Events that overlap share
+// the width of the column. A deadline is a line across its day at its time; a
+// task with a time is a small checkbox chip at that time, and a task with only
+// a date sits at the bottom of its day. All-day events and events of 24 hours
+// or more are bars in the all-day row, across the days they cover.
 
 const MIN_PX = 20; // shortest an event block can be drawn, so it stays tappable
+const TASK_PX = 18; // height of a task chip
+const TAG_PX = 16; // height of a deadline's title tag
+const AD_ROW = 22; // all-day row: one bar plus the gap below it
 
-export function renderTimeGrid({ days, occs, settings }) {
+// Where a moment goes on a day's timeline: above the hours shown ('early'),
+// below them ('late'), or `top` pixels down the column.
+export function placeAt(min, H0, H1, ppm) {
+  if (min < H0) return { where: 'early' };
+  if (min >= H1) return { where: 'late' };
+  return { where: 'grid', top: (min - H0) * ppm };
+}
+
+// A task with a time sits at that time; one with only a date, at the bottom.
+export const taskPlace = (task, H0, H1, ppm) =>
+  (task.dueTime ? placeAt(parseTime(task.dueTime), H0, H1, ppm) : { where: 'bottom' });
+
+// Events drawn as bars in the all-day row instead of on the timeline.
+export const isBarEvent = (occ) => occ.ev.kind !== 'deadline' && (occ.ev.allDay || absMin(occ.end) - absMin(occ.start) >= 1440);
+
+export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), settings }) {
   const H0 = settings.dayStart * 60;
   const H1 = settings.dayEnd * 60;
   const ppm = settings.hourHeight / 60;
+  const colH = (H1 - H0) * ppm;
+  const h24 = settings.h24;
+  const n = days.length;
   const t = today();
-  const cols = new Map(days.map((d) => [d, { allDay: [], early: [], late: [], segs: [] }]));
+  const color = (item, fallback) => colorOf(item, labels, fallback);
+  const cols = new Map(days.map((d) => [d, { oor: [], segs: [], marks: [], bottom: [] }]));
+  const bars = [];
+
+  // Items outside the hours shown become chips in the all-day row.
+  const oor = (col, where, min, html) => col.oor.push({ order: where === 'early' ? 0 : 1, min, html });
+  const arrow = (where) => (where === 'early' ? icons.up : icons.down);
 
   for (const occ of occs) {
-    if (occ.ev.allDay) {
-      for (const d of days) if (d >= occ.date && d <= occ.end) cols.get(d).allDay.push(occ);
+    const ev = occ.ev;
+    if (ev.kind === 'deadline') {
+      const col = cols.get(occ.date);
+      if (!col) continue;
+      const min = minOf(occ.start);
+      const p = placeAt(min, H0, H1, ppm);
+      if (p.where === 'grid') col.marks.push({ occ, top: p.top });
+      else oor(col, p.where, min, (style) => chip(occ, color(ev), 'oor dl-chip', `${arrow(p.where)}<b>${fmtTime(min, h24)}</b>${icons.flag}${esc(ev.title || '(No title)')}`, style));
+      continue;
+    }
+    if (isBarEvent(occ)) {
+      bars.push({ occ, first: occ.date, last: addDays(occ.date, spanDays(ev)), title: ev.title || '' });
       continue;
     }
     // Cut the event into one piece per day it touches.
@@ -29,8 +72,9 @@ export function renderTimeGrid({ days, occs, settings }) {
       const b = Math.min(e, ds + 1440) - ds;
       if (b <= a) continue;
       const col = cols.get(d);
-      if (b <= H0) col.early.push({ occ, a });
-      else if (a >= H1) col.late.push({ occ, a });
+      const label = (where) => (style) => chip(occ, color(ev), 'oor', `${arrow(where)}<b>${fmtTime(a, h24)}</b> ${esc(ev.title || '(No title)')}`, style);
+      if (b <= H0) oor(col, 'early', a, label('early'));
+      else if (a >= H1) oor(col, 'late', a, label('late'));
       else {
         col.segs.push({
           occ,
@@ -43,55 +87,110 @@ export function renderTimeGrid({ days, occs, settings }) {
     }
   }
 
+  for (const task of tasks) {
+    const col = cols.get(task.due);
+    if (!col) continue;
+    const p = taskPlace(task, H0, H1, ppm);
+    if (p.where === 'grid') col.marks.push({ task, top: p.top });
+    else if (p.where === 'bottom') col.bottom.push(task);
+    else {
+      const min = parseTime(task.dueTime);
+      oor(col, p.where, min, (style) => taskChip(task, color(task, 'none'), 'chip oor tk-chip', `${arrow(p.where)}<b>${fmtTime(min, h24)}</b>`, style));
+    }
+  }
+
   const heads = days.map((d) => {
     const cls = ['tg-dayhead', d === t && 'today', d < t && 'past'].filter(Boolean).join(' ');
     return `<button class="${cls}" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}"><span class="dow">${fmt(d, { weekday: 'short' })}</span><span class="dom">${parts(d).d}</span></button>`;
   });
 
-  const allDays = days.map((d) => {
-    const { allDay, early, late } = cols.get(d);
-    allDay.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : (x.ev.title || '').localeCompare(y.ev.title || '')));
-    const sortByTime = (x, y) => x.a - y.a;
-    const chips = [
-      ...allDay.map((o) => chip(o, 'allday', esc(o.ev.title || '(No title)'))),
-      ...early.sort(sortByTime).map((x) => chip(x.occ, 'oor', `${icons.up}<b>${fmtTime(x.a, settings.h24)}</b> ${esc(x.occ.ev.title || '(No title)')}`)),
-      ...late.sort(sortByTime).map((x) => chip(x.occ, 'oor', `${icons.down}<b>${fmtTime(x.a, settings.h24)}</b> ${esc(x.occ.ev.title || '(No title)')}`)),
-    ];
-    return `<div class="tg-allday${isWeekend(d) ? ' wkend' : ''}">${chips.join('')}</div>`;
+  // The all-day row: one strip across every day, with bars in lanes and each
+  // day's out-of-hours chips under its bars.
+  const { segs: barSegs, used } = layoutBars(bars, days);
+  const strip = days.map((d, i) =>
+    `<div class="ad-day${isWeekend(d) ? ' wkend' : ''}" data-date="${d}" style="left:calc(${i} * 100% / ${n});width:calc(100% / ${n})"></div>`);
+  for (const s of barSegs) {
+    const ev = s.item.occ.ev;
+    const time = !ev.allDay && !s.contL ? `<b>${fmtTime(minOf(s.item.occ.start), h24)}</b> ` : '';
+    strip.push(barHtml(s, { n, top: `${3 + s.lane * AD_ROW}px`, label: time + esc(ev.title || '(No title)'), color: color(ev) }));
+  }
+  let rows = 1;
+  days.forEach((d, i) => {
+    const list = cols.get(d).oor.sort((x, y) => x.order - y.order || x.min - y.min);
+    list.forEach((x, k) => strip.push(x.html(`left:calc(${i} * 100% / ${n} + 2px);width:calc(100% / ${n} - 4px);top:${3 + (used[i] + k) * AD_ROW}px`)));
+    rows = Math.max(rows, used[i] + list.length);
   });
+  const adH = rows * AD_ROW + 4;
 
   const bodies = days.map((d) => {
-    const { segs } = cols.get(d);
+    const { segs, marks, bottom } = cols.get(d);
     layout(segs, MIN_PX / ppm);
-    const blocks = segs.map((seg) => eventBlock(seg, H0, ppm, settings.h24));
-    let now = '';
+    const html = segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev)));
+    // Deadlines and timed tasks, top to bottom. A deadline's tag sits above its
+    // line, or below it when there's no room; task chips that would overlap
+    // move down.
+    marks.sort((x, y) => x.top - y.top);
+    let taskFloor = -Infinity;
+    let tagFloor = -Infinity;
+    const tags = []; // [top, bottom] of each deadline tag
+    for (const m of marks) {
+      if (m.occ) {
+        const below = m.top - TAG_PX < Math.max(0, tagFloor);
+        tagFloor = below ? m.top + TAG_PX : m.top;
+        tags.push(below ? [m.top - 1, m.top + TAG_PX] : [m.top - TAG_PX, m.top + 1]);
+        html.push(deadlineLine(m.occ, m.top, h24, color(m.occ.ev), below));
+      } else {
+        const top = Math.max(m.top, taskFloor);
+        taskFloor = top + TASK_PX + 2;
+        html.push(taskChip(m.task, color(m.task, 'none'), 'tchip', '', `top:${top}px`));
+      }
+    }
+    // Date-only tasks stack up from the bottom, above any deadline tag there.
+    let y = colH - TASK_PX - 2;
+    for (const task of bottom.sort((a, b) => a.done - b.done || (a.createdAt || 0) - (b.createdAt || 0))) {
+      for (let hit = tags.find(([a, b]) => y < b && y + TASK_PX > a); hit; hit = tags.find(([a, b]) => y < b && y + TASK_PX > a)) y = hit[0] - TASK_PX - 2;
+      html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:${y}px`));
+      y -= TASK_PX + 2;
+    }
     if (d === t) {
-      const n = nowMin();
-      if (n >= H0 && n < H1) now = `<div class="now" style="top:${(n - H0) * ppm}px"></div>`;
+      const nm = nowMin();
+      if (nm >= H0 && nm < H1) html.push(`<div class="now" style="top:${(nm - H0) * ppm}px"></div>`);
     }
     const cls = ['tg-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
-    return `<div class="${cls}" data-date="${d}">${blocks.join('')}${now}</div>`;
+    return `<div class="${cls}" data-date="${d}">${html.join('')}</div>`;
   });
 
-  const labels = [];
+  const labelsHtml = [];
   for (let h = settings.dayStart; h < settings.dayEnd; h++) {
-    const label = settings.h24 ? `${pad(h)}:00` : `${h % 12 || 12} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
-    labels.push(`<span style="top:${(h * 60 - H0) * ppm}px">${label}</span>`);
+    const label = h24 ? `${pad(h)}:00` : `${h % 12 || 12} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
+    labelsHtml.push(`<span style="top:${(h * 60 - H0) * ppm}px">${label}</span>`);
   }
 
-  return `<div class="tg n${days.length}" style="--hh:${settings.hourHeight}px">
-    <div class="tg-grid" style="grid-template-columns:var(--axis-w) repeat(${days.length}, minmax(var(--col-min), 1fr))">
+  return `<div class="tg n${n}" style="--hh:${settings.hourHeight}px">
+    <div class="tg-grid" style="grid-template-columns:var(--axis-w) repeat(${n}, minmax(var(--col-min), 1fr))">
       <div class="tg-corner"></div>${heads.join('')}
-      <div class="tg-adlabel">all-day</div>${allDays.join('')}
-      <div class="tg-axis" style="height:${(H1 - H0) * ppm}px">${labels.join('')}</div>${bodies.join('')}
+      <div class="tg-adlabel" style="height:${adH}px">all-day</div><div class="tg-allday" style="height:${adH}px">${strip.join('')}</div>
+      <div class="tg-axis" style="height:${colH}px">${labelsHtml.join('')}</div>${bodies.join('')}
     </div>
   </div>`;
 }
 
 const isWeekend = (d) => weekday(d) === 0 || weekday(d) === 6;
 
-function chip(occ, cls, html) {
-  return `<div class="chip c-${occ.ev.color || 'blue'} ${cls}${occ.ev.tentative ? ' tent' : ''}" role="button" tabindex="0" data-id="${esc(occ.ev.id)}" data-date="${occ.date}">${html}</div>`;
+function chip(occ, color, cls, html, style) {
+  return `<div class="chip c-${color} ${cls}${occ.ev.tentative ? ' tent' : ''}" style="${style}" role="button" tabindex="0" data-id="${esc(occ.ev.id)}" data-date="${occ.date}">${html}</div>`;
+}
+
+// A task with a tick box. Ticking marks it done; anywhere else opens it.
+function taskChip(task, color, cls, before, style) {
+  const title = esc(task.title || '(No title)');
+  return `<div class="${cls} c-${color}${task.done ? ' done' : ''}" style="${style}" role="button" tabindex="0" data-task="${esc(task.id)}" title="${title}${task.done ? ' (done)' : ''}">${before}<input type="checkbox" data-toggle="${esc(task.id)}" ${task.done ? 'checked' : ''} aria-label="Done"><span class="tk-t">${title}</span></div>`;
+}
+
+function deadlineLine(occ, top, h24, color, below) {
+  const ev = occ.ev;
+  const title = esc(ev.title || '(No title)');
+  return `<div class="dl c-${color}${below ? ' below' : ''}" style="top:${top}px" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, due ${fmtTime(minOf(occ.start), h24)}"><span class="dl-tag">${icons.flag}<span>${title}</span></span></div>`;
 }
 
 // Splits overlapping events into side-by-side columns. Each event gets a
@@ -131,7 +230,7 @@ function layout(segs, minMinutes) {
   if (group.length) place();
 }
 
-function eventBlock(seg, H0, ppm, h24) {
+function eventBlock(seg, H0, ppm, h24, color) {
   const { occ } = seg;
   const ev = occ.ev;
   const top = (seg.va - H0) * ppm;
@@ -140,13 +239,15 @@ function eventBlock(seg, H0, ppm, h24) {
   const title = esc(ev.title || '(No title)');
   const time = fmtTimeRange(minOf(occ.start), minOf(occ.end), h24);
   const repeat = ev.rrule || ev.seriesId ? `<span class="ev-rep" title="Repeats">${icons.repeat}</span>` : '';
-  const cls = ['ev', `c-${ev.color || 'blue'}`, ev.tentative && 'tent', short && 'short', seg.contTop && 'ct', seg.contBottom && 'cb'].filter(Boolean).join(' ');
+  const cls = ['ev', `c-${color}`, ev.tentative && 'tent', short && 'short', seg.contTop && 'ct', seg.contBottom && 'cb'].filter(Boolean).join(' ');
   // Events with something beside them stretch partly under it, so narrow
   // columns stay readable; later columns are drawn on top.
   const left = (seg.col / seg.cols) * 100;
   const own = (seg.span / seg.cols) * 100;
   const width = seg.col + seg.span < seg.cols ? Math.min(100 - left, own * 1.7) : own;
   const style = `top:${top}px;height:${height}px;left:calc(${left}% + 1px);width:calc(${width}% - 3px);z-index:${1 + seg.col}`;
+  // Short blocks put the title first and give it the room; the time only
+  // shows in what's left over.
   const body = short
     ? `<span class="ev-t">${title}</span><span class="ev-m">${fmtTime(minOf(occ.start), h24)}</span>`
     : `<span class="ev-t">${title}</span><span class="ev-m">${time}${repeat}</span>`;

@@ -22,8 +22,8 @@ touch the code.
     the text color on each event color.
   - *Size*: PC and Phone modes (`layout/hour-height` = how tall an hour is,
     `layout/hour-column-width`, `radius/event`, …).
-- **Text styles** use Inter. The app currently uses each device's system
-  font; choosing the font is one of your design decisions.
+- **Text styles** use Arial, like the app (Korean text falls back to Apple SD
+  Gothic Neo on iPhone and Malgun Gothic on Windows).
 
 Month view, the task sheet and the settings screen aren't rebuilt yet. Ask
 Claude to add any screen you want to redesign.
@@ -72,9 +72,11 @@ Figma's free "Figma Design for beginners" course covers all of these.
 - **Not designable:** the iPhone date/time picker wheels and dropdown menus
   are drawn by iOS. The fields that open them can be styled, and custom
   pickers can be built if you want full control (extra work).
-- **Fonts:** right now the app uses each device's system font (SF Pro on
-  iPhone, Segoe UI on Windows), so it looks slightly different on each. Pick
-  a web font (e.g. Pretendard for Korean + English) if you want them identical.
+- **Fonts:** the app uses Arial, which every iPhone and PC has. Korean
+  letters come from Apple SD Gothic Neo (iPhone) or Malgun Gothic (Windows).
+- **Hour height** comes from the app's Settings (30 px by default), not from
+  where a block sits in a frame: the Figma screens are drawn at 30 px an hour
+  to match.
 
 ## Name your layers
 
@@ -83,12 +85,14 @@ each layer is:
 
 | Part | Name in Figma |
 |---|---|
-| Top bar and its buttons | `Top bar`, `Today button`, `Prev`, `Next`, `Range title`, `View switcher`, `Tasks button`, `Settings button`, `New button` |
+| Top bar and its buttons | `Top bar`, `Today button`, `Prev`, `Next`, `Range title`, `View switcher`, `Tasks button`, `Settings button`, `New buttons` (Event / Deadline / Task) |
 | Timeline | `Day header` (variant: Today / Past / Other), `All-day row`, `Hour label`, `Hour line`, `Half-hour line`, `Day column` (variant: Weekend / Today), `Now line` |
-| Events | `Event block` (variants: Normal / Short / Tentative / Continues), `All-day chip`, `Outside-hours chip` |
-| Month | `Month cell` (variants: Today / Other month / Weekend), `Month event` (Timed / All-day / Tentative), `More link` |
+| Events | `Event block` (variants: Normal / Short / Tentative / Continues), `Event bar` (Block / Arrows / Line), `Outside-hours chip` |
+| Deadlines and tasks | `Deadline line`, `Deadline chip`, `Calendar task` (Open / Done), `Month task` |
+| Month and 2 weeks | `Month cell` (variants: Today / Other month / Weekend), `Month event` (Timed / Tentative), `More link` |
 | Tasks | `Tasks panel`, `Task add field`, `Task group header` (Today / Overdue / Other), `Task row` (Open / Done / Overdue) |
-| Dialogs | `Event editor`, `Repeat options`, `Scope dialog`, `Task editor`, `Settings`, `Switch`, `Weekday button`, `Color swatch` |
+| Labels | `Label pill` (Off / On / Retired), `Label row` (Active / Retired) |
+| Dialogs | `Event editor`, `Repeat options`, `Scope dialog`, `Task editor`, `Labels`, `Create menu`, `Settings`, `Switch`, `Weekday button`, `Color swatch` |
 
 ## Current measurements
 
@@ -102,11 +106,13 @@ dark-mode block.
 | View switcher | 30px segments, 7px corners inside a 9px-corner track |
 | Day header | 52px tall (48 phone); weekday 11px uppercase; date 17px semibold in a 28px circle (today filled) |
 | Hour column | 56px wide (42 phone); labels 10.5px |
-| Hour height | 52px (Compact 40, Large 68 in Settings) |
+| Hour height | 30px (40, 52 and 68 in Settings) |
 | Grid lines | hour: 1px line color; half-hour: 1px softer line |
-| Event block | 6px corners, 3px colored left edge, 17% color tint; title 12px semibold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line |
+| Event block | 6px corners, 17% color tint, no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
 | Tentative event | 6% tint, 1.5px dashed outline |
-| All-day chip | 20px tall, 5px corners, 11.5px text, solid color |
+| Event bar (all-day row) | 20px tall (18 in month, 16 phone), 5px corners, 11.5px text; Block = solid color, Arrows/Line = 2px line with the title in the middle, 8 × 10px arrowheads |
+| Deadline | 2px line across the day; title tag 16px tall, 10.5px bold white text on the color, 4px corners (square where it meets the line) |
+| Calendar task | 18px tall, 5px corners, 1px color outline, 12px tick box, 11px text |
 | Now line | 2px red, 10px dot |
 | Month cell | date 12.5px in a 24px circle; events 18px tall, 11.5px text; "+N more" |
 | Tasks panel | 300px wide (phone: sheet from the bottom, 75% of screen); title 16px; group headers 11.5px uppercase; 18px checkboxes |
@@ -120,5 +126,6 @@ Add these to `https://mido-kim.github.io/planner/?demo` (or
 
 - `&view=day`, `&view=week`, `&view=2week`, `&view=month`
 - `&show=tasks` (task sheet on phone), `&show=event` (editor with repeat
-  options), `&show=new-event`, `&show=delete` (this/following/all), `&show=task`,
-  `&show=settings`
+  options), `&show=deadline`, `&show=new-event`, `&show=create` (the
+  event / deadline / task menu), `&show=delete` (this/following/all),
+  `&show=task`, `&show=labels`, `&show=settings`

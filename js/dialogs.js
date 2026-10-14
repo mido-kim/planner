@@ -1,6 +1,8 @@
 import { absMin, addDays, dateOf, diffDays, dt, fmt, fromAbsMin, minOf, parseTime, parts, timeValue, weekday } from './dates.js';
 import { icons } from './icons.js';
-import { describeRule, inLastWeekOfMonth, nthOf, ORDINALS, ruleKey, WEEKDAYS, WEEKDAYS_SHORT } from './recurrence.js';
+import { activeLabels, isRetired, retiredLabels, usageText } from './labels.js';
+import { describeRule, inLastWeekOfMonth, nthOf, ORDINALS, ruleKey, spanDays, WEEKDAYS, WEEKDAYS_SHORT } from './recurrence.js';
+import { HOUR_HEIGHTS } from './settings.js';
 import { COLORS, esc } from './util.js';
 import { VERSION } from './version.js';
 
@@ -33,6 +35,55 @@ function run(className, html, setup, { backdropCloses = false } = {}) {
 
 const fieldRow = (label, control, cls = '') =>
   `<div class="field-row ${cls}"><span class="lbl">${label}</span><div class="ctl">${control}</div></div>`;
+
+const swatches = (colors, name = 'color') =>
+  `<div class="swatches">${colors.map((c) => `<label class="swatch c-${c}" title="${c === 'none' ? 'No color' : c}"><input type="radio" name="${name}" value="${c}"><span></span></label>`).join('')}</div>`;
+
+// Checks the radio button `name` with `value`, if there is one.
+function check(root, name, value) {
+  const input = root.querySelector(`input[name="${name}"][value="${CSS.escape(value)}"]`);
+  if (input) input.checked = true;
+  return !!input;
+}
+
+// ---------------------------------------------------------------- Label picker
+
+// Pills for "no label" and each active label (plus the item's own label if
+// it's retired), with a link to the label manager. `onPick` gets the label
+// picked, or null for none.
+function setupLabelPicker(f, { labels, labelId, manageLabels, onPick }) {
+  const box = f.querySelector('.label-pills');
+  const draw = (cur) => {
+    const all = labels();
+    const list = activeLabels(all);
+    const own = cur ? all.get(cur) : null;
+    if (own && isRetired(own)) list.push(own);
+    const pill = (l) => `<label class="lpill c-${l.color}${isRetired(l) ? ' retired' : ''}"><input type="radio" name="label" value="${esc(l.id)}"><span><i></i>${esc(l.name)}${isRetired(l) ? ' <em>(retired)</em>' : ''}</span></label>`;
+    box.innerHTML = `<label class="lpill none"><input type="radio" name="label" value=""><span>None</span></label>${list.map(pill).join('')}
+      <button type="button" class="link small" data-manage-labels>${list.length ? 'Edit labels' : 'Make a label'}</button>`;
+    if (!own || !check(f, 'label', cur)) check(f, 'label', '');
+  };
+  draw(labelId);
+  box.addEventListener('change', (e) => {
+    if (e.target.name === 'label') onPick(labels().get(e.target.value) || null);
+  });
+  box.addEventListener('click', async (e) => {
+    if (!e.target.closest('[data-manage-labels]')) return;
+    const cur = f.elements.label.value;
+    await manageLabels();
+    draw(cur);
+    onPick(labels().get(f.elements.label.value) || null, true);
+  });
+}
+
+// The color to store: none when it's the label's own color, so the item
+// follows its label if the label is recolored later.
+function pickedColor(f, labels, fallback) {
+  const label = labels().get(f.elements.label.value);
+  const c = f.elements.color.value;
+  if (!c || c === 'none') return label ? null : fallback;
+  return label && label.color === c ? null : c;
+}
 
 // ---------------------------------------------------------------- Repeat presets
 
@@ -81,7 +132,7 @@ const clampInt = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(+v) || lo))
 
 // Resolves with { action: 'save', form, scope } or { action: 'delete', scope },
 // or null if cancelled. `scope` is null unless the event repeats.
-export function eventEditor({ initial, isNew, repeating, settings }) {
+export function eventEditor({ initial, isNew, repeating, settings, labels, manageLabels }) {
   const order = [0, 1, 2, 3, 4, 5, 6].map((i) => (i + settings.weekStart) % 7);
   const html = `
   <form class="dlg editor" novalidate>
@@ -90,10 +141,14 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
       <button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button>
     </div>
     <div class="dlg-body">
-      <label class="field-row toggle-row"><span class="lbl">All day</span><input type="checkbox" name="allDay" class="switch"></label>
-      <label class="field-row toggle-row"><span class="lbl">Tentative <span class="hint">(shown lightly, dashed outline)</span></span><input type="checkbox" name="tentative" class="switch"></label>
-      ${fieldRow('Starts', '<input type="date" name="startDate" required><input type="time" name="startTime" class="time">', 'dt-row')}
-      ${fieldRow('Ends', '<input type="date" name="endDate" required><input type="time" name="endTime" class="time">', 'dt-row')}
+      <div class="kind-seg" role="radiogroup" aria-label="Type">
+        <label><input type="radio" name="kind" value="event"><span>${icons.event}Event</span></label>
+        <label><input type="radio" name="kind" value="deadline"><span>${icons.flagBtn}Deadline</span></label>
+      </div>
+      <label class="field-row toggle-row ev-only"><span class="lbl">All day</span><input type="checkbox" name="allDay" class="switch"></label>
+      <label class="field-row toggle-row ev-only"><span class="lbl">Tentative <span class="hint">(shown lightly, dashed outline)</span></span><input type="checkbox" name="tentative" class="switch"></label>
+      ${fieldRow('<span class="ev-only">Starts</span><span class="dl-only">Due</span>', '<input type="date" name="startDate" required><input type="time" name="startTime" class="time">', 'dt-row')}
+      ${fieldRow('Ends', '<input type="date" name="endDate" required><input type="time" name="endTime" class="time">', 'dt-row ev-only')}
       ${fieldRow('Repeat', '<select name="repeat"></select>')}
       <div class="repeat-more">
         <div class="custom">
@@ -106,7 +161,13 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
           <input type="date" name="until"><span class="count-wrap"><input type="number" name="count" min="1" max="999" inputmode="numeric" class="num"> times</span>`)}
         <p class="hint repeat-summary"></p>
       </div>
-      ${fieldRow('Color', `<div class="swatches">${COLORS.map((c) => `<label class="swatch c-${c}" title="${c}"><input type="radio" name="color" value="${c}"><span></span></label>`).join('')}</div>`)}
+      ${fieldRow('Shape', `<div class="shape-pick" role="radiogroup" aria-label="Shape">
+          <label><input type="radio" name="shape" value="block"><span><svg class="sp" width="30" height="10" viewBox="0 0 30 10" aria-hidden="true"><rect width="30" height="10" rx="3" fill="currentColor"/></svg>Block</span></label>
+          <label><input type="radio" name="shape" value="arrow"><span><svg class="sp" width="30" height="10" viewBox="0 0 30 10" aria-hidden="true"><path d="M5 5h20" stroke="currentColor" stroke-width="2"/><path d="M0 5l7-4.5v9zM30 5l-7-4.5v9z" fill="currentColor"/></svg>Arrows</span></label>
+          <label><input type="radio" name="shape" value="line"><span><svg class="sp" width="30" height="10" viewBox="0 0 30 10" aria-hidden="true"><path d="M1 5h28" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Line</span></label>
+        </div>`, 'shape-row')}
+      ${fieldRow('Label', '<div class="label-pills"></div>', 'label-row')}
+      ${fieldRow('Color', swatches(COLORS))}
       <textarea name="notes" rows="3" placeholder="Notes" aria-label="Notes"></textarea>
       <p class="form-error" role="alert" hidden></p>
     </div>
@@ -129,9 +190,16 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
     el('tentative').checked = !!initial.tentative;
     el('startDate').value = dateOf(initial.start);
     el('endDate').value = dateOf(initial.end);
+    // A deadline has no end; if it's turned into an event, it lasts an hour.
+    const deadline0 = initial.kind === 'deadline';
+    const end0 = deadline0 ? fromAbsMin(absMin(initial.start) + 60) : initial.end;
+    el('endDate').value = dateOf(end0);
     el('startTime').value = timeValue(initial.allDay ? 9 * 60 : minOf(initial.start));
-    el('endTime').value = timeValue(initial.allDay ? 10 * 60 : minOf(initial.end));
-    (f.querySelector(`input[name=color][value="${initial.color}"]`) || f.querySelector('input[name=color]')).checked = true;
+    el('endTime').value = timeValue(initial.allDay ? 10 * 60 : minOf(end0));
+    check(f, 'kind', deadline0 ? 'deadline' : 'event');
+    check(f, 'shape', ['arrow', 'line'].includes(initial.shape) ? initial.shape : 'block');
+    const label0 = initial.labelId ? labels().get(initial.labelId) : null;
+    if (!check(f, 'color', initial.color || label0?.color || 'blue')) check(f, 'color', 'blue');
     el('notes').value = initial.notes || '';
 
     const startDate = () => el('startDate').value || dateOf(initial.start);
@@ -192,9 +260,34 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
       f.querySelector('.repeat-summary').textContent = repeatKey === 'none' ? '' : describeRule(currentRule(), d);
     };
 
-    f.classList.toggle('all-day', el('allDay').checked);
+    // Which rows show: a deadline has one date and time; the shape choice is
+    // for events drawn as bars (all-day, or running into another day).
+    const isDeadline = () => f.elements.kind.value === 'deadline';
+    const updateKindUI = () => {
+      f.classList.toggle('is-deadline', isDeadline());
+      f.classList.toggle('all-day', !isDeadline() && el('allDay').checked);
+      const sd = el('startDate').value;
+      const ed = el('endDate').value;
+      const span = sd && ed ? spanDays({ allDay: false, start: dt(sd, parseTime(el('startTime').value)), end: dt(ed, parseTime(el('endTime').value)) }) : 0;
+      f.classList.toggle('bar-like', !isDeadline() && (el('allDay').checked || span > 0));
+      f.style.setProperty('--c', `var(--c-${f.elements.color.value || 'blue'})`);
+    };
+    updateKindUI();
     fillRepeat();
     updateRepeatUI();
+
+    setupLabelPicker(f, {
+      labels,
+      labelId: initial.labelId,
+      manageLabels,
+      onPick: (label, redrawn) => {
+        if (label && !redrawn) check(f, 'color', label.color);
+        updateKindUI();
+      },
+    });
+    f.addEventListener('change', (e) => {
+      if (['kind', 'color', 'allDay', 'startDate', 'startTime', 'endDate', 'endTime'].includes(e.target.name)) updateKindUI();
+    });
 
     const fail = (msg) => {
       const p = f.querySelector('.form-error');
@@ -204,7 +297,6 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
     };
 
     // ---- inputs
-    el('allDay').addEventListener('change', () => f.classList.toggle('all-day', el('allDay').checked));
 
     const onStartChange = (prevDate) => {
       if (!el('startDate').value) return;
@@ -273,13 +365,17 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
 
     // ---- save / delete
     const collect = () => {
-      const allDay = el('allDay').checked;
+      const kind = isDeadline() ? 'deadline' : 'event';
+      const allDay = kind === 'event' && el('allDay').checked;
       const sd = el('startDate').value;
       const ed = el('endDate').value;
-      if (!sd || !ed) return fail('Pick a start and end date.');
+      if (!sd || (kind === 'event' && !ed)) return fail(kind === 'deadline' ? 'Pick a date.' : 'Pick a start and end date.');
       let start;
       let end;
-      if (allDay) {
+      if (kind === 'deadline') {
+        start = dt(sd, parseTime(el('startTime').value));
+        end = start;
+      } else if (allDay) {
         if (ed < sd) return fail('The end date is before the start date.');
         start = sd;
         end = ed;
@@ -291,10 +387,13 @@ export function eventEditor({ initial, isNew, repeating, settings }) {
       const rrule = currentRule();
       if (rrule?.until && rrule.until < sd) return fail('The repeat end date is before the event starts.');
       return {
+        kind,
         title: el('title').value.trim(),
         notes: el('notes').value.trim(),
-        color: f.elements.color.value || 'blue',
-        tentative: el('tentative').checked,
+        labelId: f.elements.label.value || null,
+        color: pickedColor(f, labels, 'blue'),
+        shape: kind === 'event' ? f.elements.shape.value : 'block',
+        tentative: kind === 'event' && el('tentative').checked,
         allDay,
         start,
         end,
@@ -357,34 +456,50 @@ export function askScope(kind, { allowThis = true } = {}) {
 // ---------------------------------------------------------------- Task editor
 
 // Resolves with { action: 'save', fields } or { action: 'delete' }, or null.
-export function taskEditor(task) {
+export function taskEditor(task, { isNew = false, labels, manageLabels }) {
   const html = `
-  <form class="dlg editor" novalidate>
+  <form class="dlg editor task-editor" novalidate>
     <div class="dlg-head">
       <input class="title-input" name="title" placeholder="Task" autocomplete="off" maxlength="200" aria-label="Task">
       <button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button>
     </div>
     <div class="dlg-body">
-      <label class="field-row toggle-row"><span class="lbl">Done</span><input type="checkbox" name="done" class="switch"></label>
+      ${isNew ? '' : '<label class="field-row toggle-row"><span class="lbl">Done</span><input type="checkbox" name="done" class="switch"></label>'}
       ${fieldRow('Due', '<input type="date" name="due"><input type="time" name="dueTime" class="time">', 'dt-row')}
-      <p class="hint">Leave the date empty to keep it under “No date”.</p>
+      <p class="hint">With a date it shows on the calendar: at its time, or at the end of the day without one. Leave the date empty to keep it under “No date”.</p>
+      ${fieldRow('Label', '<div class="label-pills"></div>', 'label-row')}
+      ${fieldRow('Color', swatches(['none', ...COLORS]))}
       <textarea name="notes" rows="4" placeholder="Notes" aria-label="Notes"></textarea>
       <p class="form-error" role="alert" hidden></p>
     </div>
     <div class="dlg-foot">
-      <button type="button" class="btn danger-text" data-delete>Delete</button>
+      ${isNew ? '' : '<button type="button" class="btn danger-text" data-delete>Delete</button>'}
       <span class="spacer"></span>
       <button type="button" class="btn" data-cancel>Cancel</button>
-      <button type="submit" class="btn primary">Save</button>
+      <button type="submit" class="btn primary">${isNew ? 'Add task' : 'Save'}</button>
     </div>
   </form>`;
   return run('sheet', html, (dlg, finish) => {
     const f = dlg.querySelector('form');
-    f.elements.title.value = task.title;
-    f.elements.done.checked = !!task.done;
+    f.elements.title.value = task.title || '';
+    if (f.elements.done) f.elements.done.checked = !!task.done;
     f.elements.due.value = task.due || '';
     f.elements.dueTime.value = task.dueTime || '';
     f.elements.notes.value = task.notes || '';
+    const label0 = task.labelId ? labels().get(task.labelId) : null;
+    if (!check(f, 'color', task.color || label0?.color || 'none')) check(f, 'color', 'none');
+    const sync = () => f.classList.toggle('has-label', !!f.elements.label.value);
+    setupLabelPicker(f, {
+      labels,
+      labelId: task.labelId,
+      manageLabels,
+      onPick: (label, redrawn) => {
+        if (label && !redrawn) check(f, 'color', label.color);
+        else if (!label && f.elements.color.value === 'none') check(f, 'color', 'none');
+        sync();
+      },
+    });
+    sync();
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       const title = f.elements.title.value.trim();
@@ -399,21 +514,223 @@ export function taskEditor(task) {
         action: 'save',
         fields: {
           title,
-          done: f.elements.done.checked,
+          done: f.elements.done ? f.elements.done.checked : false,
           due,
           dueTime: due ? f.elements.dueTime.value || null : null,
+          labelId: f.elements.label.value || null,
+          color: pickedColor(f, labels, null),
           notes: f.elements.notes.value.trim(),
         },
       });
     });
-    f.querySelector('[data-delete]').addEventListener('click', () => finish({ action: 'delete' }));
+    f.querySelector('[data-delete]')?.addEventListener('click', () => finish({ action: 'delete' }));
+    if (isNew) setTimeout(() => f.elements.title.focus(), 50);
+  });
+}
+
+// ---------------------------------------------------------------- Labels
+
+// Add, rename, recolor, retire, restore and delete labels. `act(type, data)`
+// makes a change and resolves once it's saved; the list then redraws from
+// `getLabels`. `bindRefresh` receives a function that redraws the list, for
+// changes that arrive from elsewhere. Resolves when closed.
+export function labelsDialog({ getLabels, usage, act, bindRefresh }) {
+  const html = `
+  <form class="dlg labels-dlg" novalidate>
+    <div class="dlg-head"><h2>Labels</h2><button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button></div>
+    <div class="dlg-body">
+      <p class="hint">A label colors its events, deadlines and tasks. Any single item can still have a color of its own.</p>
+      <div class="label-add">
+        <input name="newName" placeholder="New label" maxlength="40" autocomplete="off" aria-label="New label name">
+        <button type="submit" class="btn primary">Add</button>
+        ${swatches(COLORS, 'newColor')}
+      </div>
+      <p class="form-error" role="alert" hidden></p>
+      <section>
+        <h3>Active</h3>
+        <ul class="label-list" data-list="active"></ul>
+      </section>
+      <section>
+        <h3>Retired</h3>
+        <p class="hint">Retired labels aren’t offered when you pick a label, but items that have one keep it. Restore one any time.</p>
+        <ul class="label-list" data-list="retired"></ul>
+      </section>
+    </div>
+  </form>`;
+  return run('sheet', html, (dlg, finish) => {
+    const f = dlg.querySelector('form');
+    const err = f.querySelector('.form-error');
+    let editing = null;
+    check(f, 'newColor', COLORS[getLabels().size % COLORS.length]);
+
+    const fail = (msg) => {
+      err.textContent = msg;
+      err.hidden = !msg;
+      return !msg;
+    };
+    // Names are unique, ignoring case.
+    const nameOk = (name, id) => {
+      if (!name) return fail('Give the label a name.');
+      const twin = [...getLabels().values()].find((l) => l.id !== id && l.name.trim().toLowerCase() === name.toLowerCase());
+      if (twin) return fail(`There’s already a label called “${twin.name}”${isRetired(twin) ? ' (retired). Restore it instead' : ''}.`);
+      return fail('');
+    };
+
+    const row = (l) => {
+      const count = usageText(usage(l.id));
+      if (editing === l.id) {
+        return `<li class="lrow editing" data-id="${esc(l.id)}">
+          <input name="editName" value="${esc(l.name)}" maxlength="40" autocomplete="off" aria-label="Label name">
+          <button type="button" class="btn primary sm" data-do="save">Save</button>
+          <button type="button" class="btn sm" data-do="cancel">Cancel</button>
+          ${swatches(COLORS, 'editColor')}
+        </li>`;
+      }
+      const buttons = isRetired(l)
+        ? '<button type="button" class="btn sm" data-do="restore">Restore</button><button type="button" class="btn sm danger-text" data-do="delete">Delete…</button>'
+        : `<button type="button" class="icon-btn sm" data-do="edit" aria-label="Rename or recolor">${icons.pencil}</button><button type="button" class="btn sm" data-do="remove">Remove…</button>`;
+      return `<li class="lrow c-${l.color}${isRetired(l) ? ' retired' : ''}" data-id="${esc(l.id)}"><i class="ldot"></i><span class="lname">${esc(l.name)}<span class="lcount">${count}</span></span>${buttons}</li>`;
+    };
+    const draw = () => {
+      const all = getLabels();
+      const active = activeLabels(all);
+      const retired = retiredLabels(all);
+      f.querySelector('[data-list=active]').innerHTML = active.map(row).join('') || '<li class="empty">No labels yet. Add one above.</li>';
+      f.querySelector('[data-list=retired]').innerHTML = retired.map(row).join('') || '<li class="empty">None.</li>';
+      const e = editing && all.get(editing);
+      if (e) {
+        check(f, 'editColor', e.color);
+        f.elements.editName.focus();
+      }
+    };
+    draw();
+    bindRefresh(draw);
+
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (document.activeElement?.name === 'editName') return save(document.activeElement.closest('[data-id]').dataset.id);
+      const name = f.elements.newName.value.trim();
+      if (!nameOk(name)) return;
+      await act('add', { name, color: f.elements.newColor.value || 'blue' });
+      f.elements.newName.value = '';
+      check(f, 'newColor', COLORS[getLabels().size % COLORS.length]);
+      draw();
+    });
+
+    const save = async (id) => {
+      const name = f.elements.editName.value.trim();
+      if (!nameOk(name, id)) return;
+      await act('update', { id, name, color: f.elements.editColor.value });
+      editing = null;
+      draw();
+    };
+
+    f.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-do]');
+      if (!b) return;
+      const id = b.closest('[data-id]').dataset.id;
+      const label = getLabels().get(id);
+      if (!label) return;
+      fail('');
+      switch (b.dataset.do) {
+        case 'edit': editing = id; break;
+        case 'cancel': editing = null; break;
+        case 'save': return save(id);
+        case 'restore': await act('status', { id, status: 'active' }); break;
+        case 'remove':
+        case 'delete': {
+          const choice = await removeLabelDialog(label, usageText(usage(id)), { allowRetire: b.dataset.do === 'remove' });
+          if (choice === 'retire') await act('status', { id, status: 'retired' });
+          else if (choice === 'delete') await act('delete', { id });
+          break;
+        }
+      }
+      draw();
+    });
+  }, { backdropCloses: true });
+}
+
+// Retire or delete. Resolves with 'retire', 'delete' or null.
+function removeLabelDialog(label, used, { allowRetire }) {
+  const items = used === 'not used' ? 'No items have it.' : `This also deletes its ${used}, for good.`;
+  const html = `
+  <form class="dlg scope remove-label">
+    <div class="dlg-body">
+      <h3>${allowRetire ? 'Remove' : 'Delete'} “${esc(label.name)}”</h3>
+      ${allowRetire ? `<label class="radio-row"><input type="radio" name="how" value="retire" checked><span><b>Retire it</b><br><span class="hint">Hide it from the label picker. Its items stay as they are, and you can restore it later.</span></span></label>` : ''}
+      <label class="radio-row"><input type="radio" name="how" value="delete" ${allowRetire ? '' : 'checked'}><span><b>Delete it and its items</b><br><span class="hint">${items} You can undo right after.</span></span></label>
+    </div>
+    <div class="dlg-foot">
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-cancel>Cancel</button>
+      <button type="submit" class="btn ${allowRetire ? 'primary' : 'danger'}">${allowRetire ? 'Retire' : 'Delete'}</button>
+    </div>
+  </form>`;
+  return run('small', html, (dlg, finish) => {
+    const f = dlg.querySelector('form');
+    const ok = f.querySelector('[type=submit]');
+    f.addEventListener('change', () => {
+      const del = f.elements.how.value === 'delete';
+      ok.textContent = del ? 'Delete' : 'Retire';
+      ok.className = `btn ${del ? 'danger' : 'primary'}`;
+    });
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      finish(f.elements.how.value);
+    });
+  }, { backdropCloses: true });
+}
+
+// ---------------------------------------------------------------- Create menu
+
+// A small menu at (x, y) after clicking or dragging on the calendar: what to
+// make there. `choices` are [key, icon, label]. Resolves with a key or null.
+export function createMenu({ x, y, heading, choices }) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'cm-scrim';
+    wrap.innerHTML = `<div class="create-menu" role="menu" aria-label="${esc(heading)}">
+      <div class="cm-head">${esc(heading)}</div>
+      ${choices.map(([k, icon, label]) => `<button type="button" role="menuitem" data-k="${k}">${icon}<span>${label}</span></button>`).join('')}
+    </div>`;
+    document.body.append(wrap);
+    const menu = wrap.firstElementChild;
+    const w = menu.offsetWidth;
+    const h = menu.offsetHeight;
+    menu.style.left = `${Math.max(8, Math.min(x + 6, innerWidth - w - 8))}px`;
+    menu.style.top = `${y + 10 + h < innerHeight - 8 ? y + 10 : Math.max(8, y - h - 10)}px`;
+    const buttons = [...menu.querySelectorAll('button')];
+    const done = (value) => {
+      document.removeEventListener('keydown', onKey, true);
+      wrap.remove();
+      resolve(value);
+    };
+    const onKey = (e) => {
+      const i = buttons.indexOf(document.activeElement);
+      if (e.key === 'Escape') done(null);
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') buttons[(i + (e.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length].focus();
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    document.addEventListener('keydown', onKey, true);
+    wrap.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-k]');
+      if (b) done(b.dataset.k);
+      else if (!menu.contains(e.target)) done(null);
+    });
+    wrap.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      done(null);
+    });
+    buttons[0].focus({ preventScroll: true });
   });
 }
 
 // ---------------------------------------------------------------- Settings
 
 // Changes apply as they're made through `onChange`; buttons call `actions`.
-export function settingsDialog({ settings, sync, lastBackup, onChange, actions }) {
+export function settingsDialog({ settings, sync, lastBackup, labels, onChange, actions }) {
   const hour = (h) => (settings.h24 ? `${String(h).padStart(2, '0')}:00` : `${h % 12 || 12} ${h < 12 || h === 24 ? 'AM' : 'PM'}`);
   const hours = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
     .map((h) => `<option value="${h}">${h === 24 ? `${hour(24)} (midnight)` : hour(h)}</option>`).join('');
@@ -433,7 +750,12 @@ export function settingsDialog({ settings, sync, lastBackup, onChange, actions }
         ${fieldRow('Day ends at', `<select name="dayEnd">${hours(13, 24)}</select>`)}
         ${fieldRow('Week starts on', '<select name="weekStart"><option value="0">Sunday</option><option value="1">Monday</option></select>')}
         ${fieldRow('Time format', '<select name="h24"><option value="0">12-hour (1:30 PM)</option><option value="1">24-hour (13:30)</option></select>')}
-        ${fieldRow('Hour height', '<select name="hourHeight"><option value="40">Compact</option><option value="52">Normal</option><option value="68">Large</option></select>')}
+        ${fieldRow('Hour height', `<select name="hourHeight">${HOUR_HEIGHTS.map((h, i) => `<option value="${h}">${h} px${i === 0 ? ' (compact, default)' : i === HOUR_HEIGHTS.length - 1 ? ' (large)' : ''}</option>`).join('')}</select>`)}
+      </section>
+      <section>
+        <h3>Labels</h3>
+        <div class="label-preview"></div>
+        <div><button type="button" class="btn" data-act="labels">${icons.tag}Manage labels…</button></div>
       </section>
       <section>
         <h3>Sync</h3>
@@ -442,7 +764,7 @@ export function settingsDialog({ settings, sync, lastBackup, onChange, actions }
       <section>
         <h3>Backup</h3>
         <p class="hint">${lastBackup ? `Last backup from this device: ${fmt(new Date(lastBackup).toISOString().slice(0, 10), { month: 'short', day: 'numeric', year: 'numeric' })}.` : 'No backup saved from this device yet.'}
-          A backup holds all your events and tasks, and can be restored into this app later.</p>
+          A backup holds all your events, tasks and labels, and can be restored into this app later.</p>
         <div class="btn-stack">
           <button type="button" class="btn" data-act="backup">Download backup (.json)</button>
           <button type="button" class="btn" data-act="ics">Export events for other calendars (.ics)</button>
@@ -460,7 +782,14 @@ export function settingsDialog({ settings, sync, lastBackup, onChange, actions }
     f.elements.dayEnd.value = settings.dayEnd;
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
-    f.elements.hourHeight.value = [40, 52, 68].includes(settings.hourHeight) ? settings.hourHeight : 52;
+    f.elements.hourHeight.value = HOUR_HEIGHTS.includes(settings.hourHeight) ? settings.hourHeight : HOUR_HEIGHTS[0];
+    const drawLabels = () => {
+      const list = activeLabels(labels());
+      f.querySelector('.label-preview').innerHTML = list.length
+        ? list.map((l) => `<span class="lpill static c-${l.color}"><span><i></i>${esc(l.name)}</span></span>`).join('')
+        : '<p class="hint">No labels yet. Labels color your events, deadlines and tasks by kind, like “Research” or “Teaching”.</p>';
+    };
+    drawLabels();
     f.addEventListener('change', (e) => {
       if (e.target.name === 'restoreFile') return;
       onChange({
@@ -472,12 +801,15 @@ export function settingsDialog({ settings, sync, lastBackup, onChange, actions }
       });
     });
     f.addEventListener('submit', (e) => e.preventDefault());
-    f.addEventListener('click', (e) => {
+    f.addEventListener('click', async (e) => {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'restore') f.elements.restoreFile.click();
       else if (act === 'signOut') {
         finish(null);
         actions.signOut();
+      } else if (act === 'labels') {
+        await actions.labels();
+        drawLabels();
       } else if (act) actions[act]();
     });
     f.elements.restoreFile.addEventListener('change', async () => {

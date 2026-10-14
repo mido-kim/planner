@@ -1,7 +1,10 @@
-import { icsFile } from '../js/backup.js';
+import { backupFile, icsFile, parseBackup } from '../js/backup.js';
 import { addDays, diffDays, fmtTimeRange, weekday } from '../js/dates.js';
+import { activeLabels, colorOf, deleteLabelOps, labelUsage, retiredLabels, setLabelStatusOps } from '../js/labels.js';
 import { alignStart, describeRule, expand, occurrenceDates, toRRule } from '../js/recurrence.js';
 import { deleteOps, saveOps } from '../js/series.js';
+import { layoutBars } from '../js/views/bars.js';
+import { isBarEvent, placeAt, taskPlace } from '../js/views/timegrid.js';
 
 const results = [];
 function test(name, fn) {
@@ -191,6 +194,99 @@ test('.ics export: series, removed date, changed occurrence', () => {
 test('.ics export marks tentative events', () => {
   if (!icsFile(map(ev({ tentative: true }))).includes('STATUS:TENTATIVE')) throw new Error('missing STATUS:TENTATIVE');
   if (icsFile(map(ev())).includes('STATUS:')) throw new Error('confirmed event should have no STATUS');
+});
+
+// ---- deadlines
+const deadline = ev({ id: 'dl', kind: 'deadline', start: '2026-10-14T17:00', end: '2026-10-14T17:00' });
+test('deadline: one occurrence on its day, none the next', () => {
+  eq(expand(deadline, '2026-10-14', '2026-10-15').length, 1);
+  eq(expand(deadline, '2026-10-15', '2026-10-16').length, 0);
+});
+test('deadline: placed at its time on the timeline, or outside the hours shown', () => {
+  // 7 AM to midnight at 30 px an hour.
+  eq(placeAt(17 * 60, 7 * 60, 24 * 60, 0.5), { where: 'grid', top: 300 });
+  eq(placeAt(6 * 60, 7 * 60, 24 * 60, 0.5), { where: 'early' });
+  eq(placeAt(23 * 60 + 30, 7 * 60, 22 * 60, 0.5), { where: 'late' });
+  eq(placeAt(23 * 60 + 59, 7 * 60, 24 * 60, 0.5).where, 'grid');
+});
+test('deadline: never a bar, even when repeating', () => {
+  const [o] = expand({ ...deadline, rrule: { freq: 'weekly', interval: 1, byWeekday: [3] } }, '2026-10-21', '2026-10-22');
+  eq([o.start, isBarEvent(o)], ['2026-10-21T17:00', false]);
+});
+test('.ics export: a deadline has a start and no end', () => {
+  const ics = icsFile(map(deadline));
+  if (!ics.includes('DTSTART:20261014T170000')) throw new Error('missing DTSTART');
+  if (ics.includes('DTEND')) throw new Error('a deadline should have no DTEND');
+});
+
+// ---- tasks on the timeline
+test('tasks: a timed task sits at its time, a date-only task at the bottom', () => {
+  eq(taskPlace({ due: '2026-10-14', dueTime: '09:30' }, 7 * 60, 24 * 60, 0.5), { where: 'grid', top: 75 });
+  eq(taskPlace({ due: '2026-10-14', dueTime: null }, 7 * 60, 24 * 60, 0.5), { where: 'bottom' });
+  eq(taskPlace({ due: '2026-10-14', dueTime: '06:00' }, 7 * 60, 24 * 60, 0.5), { where: 'early' });
+});
+
+// ---- multi-day bars
+test('bars: all-day and 24-hour events are bars; shorter overnight ones are not', () => {
+  const [a] = expand(ev({ allDay: true, start: '2026-10-14', end: '2026-10-14' }), '2026-10-14', '2026-10-15');
+  const [b] = expand(ev({ start: '2026-10-14T09:00', end: '2026-10-15T09:00' }), '2026-10-14', '2026-10-15');
+  const [c] = expand(ev({ start: '2026-10-14T22:00', end: '2026-10-15T01:30' }), '2026-10-14', '2026-10-15');
+  eq([isBarEvent(a), isBarEvent(b), isBarEvent(c)], [true, true, false]);
+});
+test('bars: span their days, cut at the edges, and share lanes when they can', () => {
+  const days = ['2026-10-11', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17'];
+  const item = (title, first, last) => ({ title, first, last });
+  const { segs, lanes, used } = layoutBars([
+    item('Trip', '2026-10-09', '2026-10-12'), // starts before the week
+    item('Conference', '2026-10-13', '2026-10-15'),
+    item('Visit', '2026-10-12', '2026-10-13'),
+    item('Move', '2026-10-16', '2026-10-20'), // runs past it
+  ], days);
+  const by = Object.fromEntries(segs.map((x) => [x.item.title, [x.a, x.b, x.lane, x.contL, x.contR]]));
+  eq(by.Trip, [0, 1, 0, true, false]);
+  eq(by.Visit, [1, 2, 1, false, false]);
+  eq(by.Conference, [2, 4, 0, false, false]);
+  eq(by.Move, [5, 6, 0, false, true]);
+  eq([lanes, used], [2, [1, 2, 2, 1, 1, 1, 1]]);
+});
+test('bars: events outside the days shown are left out', () => {
+  eq(layoutBars([{ title: 'x', first: '2026-10-01', last: '2026-10-03' }], ['2026-10-11', '2026-10-12']).segs.length, 0);
+});
+
+// ---- labels
+const labels = new Map([
+  ['L1', { id: 'L1', name: 'Research', color: 'purple', status: 'active' }],
+  ['L2', { id: 'L2', name: 'Old', color: 'gray', status: 'retired' }],
+]);
+test('labels: an item takes its label’s color unless it has its own', () => {
+  eq(colorOf({ labelId: 'L1', color: null }, labels), 'purple');
+  eq(colorOf({ labelId: 'L1', color: 'red' }, labels), 'red');
+  eq(colorOf({ labelId: null, color: null }, labels), 'blue');
+  eq(colorOf({ labelId: 'gone', color: null }, labels, 'none'), 'none');
+  eq(colorOf({ title: 'old event without the new fields', color: 'teal' }, labels), 'teal');
+});
+test('labels: retiring hides a label from the picker and keeps its items', () => {
+  const [op] = setLabelStatusOps(labels.get('L1'), 'retired');
+  const after = new Map(labels).set('L1', op.obj);
+  eq(activeLabels(after).map((l) => l.id), []);
+  eq(retiredLabels(after).map((l) => l.id), ['L2', 'L1']); // by name: Old, Research
+  eq(colorOf({ labelId: 'L1', color: null }, after), 'purple');
+  eq(setLabelStatusOps(op.obj, 'active')[0].obj.status, 'active');
+});
+test('labels: deleting a label deletes its events, deadlines and tasks', () => {
+  const events = map(ev({ id: 'a', labelId: 'L1' }), { ...deadline, labelId: 'L1' }, ev({ id: 'b', labelId: 'L2' }), ev({ id: 'c' }));
+  const tasks = new Map([['t1', { id: 't1', title: 'x', labelId: 'L1' }], ['t2', { id: 't2', title: 'y', labelId: null }]]);
+  eq(labelUsage('L1', events, tasks), { events: 1, deadlines: 1, tasks: 1 });
+  const ops = deleteLabelOps('L1', events, tasks);
+  eq(ops.map((o) => `${o.op} ${o.coll} ${o.id}`), ['remove labels L1', 'remove events a', 'remove events dl', 'remove tasks t1']);
+});
+test('backup: holds labels, and older backups without them still restore', () => {
+  const { text } = backupFile(map(ev()), new Map(), labels);
+  eq(parseBackup(text).labels.map((l) => l.id), ['L1', 'L2']);
+  eq(parseBackup(JSON.stringify({ app: 'planner', version: 1, events: [], tasks: [] })).labels, []);
+});
+test('.ics export names the label as a category', () => {
+  if (!icsFile(map(ev({ labelId: 'L1' })), labels).includes('CATEGORIES:Research')) throw new Error('missing CATEGORIES');
 });
 
 // ---- report

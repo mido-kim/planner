@@ -1,6 +1,6 @@
 // Sync through Firebase: email sign-in plus a Firestore database that keeps a
 // copy on each device, so the app also works offline and catches up later.
-// Data lives under users/{uid}/events and users/{uid}/tasks.
+// Data lives under users/{uid}/events, users/{uid}/tasks and users/{uid}/labels.
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.6.0';
 
@@ -33,10 +33,11 @@ export async function connectCloud(config) {
         subscribe(fn) {
           const maps = {};
           const pending = {};
+          const colls = ['events', 'tasks', 'labels'];
           const emit = () => {
-            if (maps.events && maps.tasks) fn({ events: maps.events, tasks: maps.tasks, pending: pending.events || pending.tasks });
+            if (colls.every((c) => maps[c])) fn({ events: maps.events, tasks: maps.tasks, labels: maps.labels, pending: colls.some((c) => pending[c]) });
           };
-          const unsubs = ['events', 'tasks'].map((coll) =>
+          const unsubs = colls.map((coll) =>
             F.onSnapshot(
               F.collection(db, 'users', user.uid, coll),
               { includeMetadataChanges: true },

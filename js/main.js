@@ -1,10 +1,11 @@
 import { backupFile, icsFile, parseBackup, saveFile } from './backup.js';
 import { firebaseConfig } from './config.js';
 import {
-  addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, nowMin, parts, shiftDays, startOfMonth, startOfWeek, today,
+  addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, fmtTime, fmtTimeRange, nowMin, parts, shiftDays, startOfMonth, startOfWeek, timeValue, today,
 } from './dates.js';
-import { askScope, eventEditor, settingsDialog, taskEditor } from './dialogs.js';
+import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, taskEditor } from './dialogs.js';
 import { icons } from './icons.js';
+import { deleteLabelOps, labelUsage, setLabelStatusOps } from './labels.js';
 import { expand } from './recurrence.js';
 import { deleteOps, isRepeating, masterOf, saveOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
@@ -17,6 +18,8 @@ import { renderTimeGrid } from './views/timegrid.js';
 const DAY_MS = 86400000;
 const BACKUP_KEY = 'planner.backup.v1'; // { last, snoozeUntil, firstSeen } for this device
 const WIDE = 900; // at this width and up, the task list sits beside the calendar
+const DEADLINE_TIME = 23 * 60 + 59; // a new deadline without a picked time is due at 11:59 PM
+const LONG_PRESS_MS = 450; // on touch screens, hold this long to start selecting
 
 const app = $('#app');
 let settings = loadSettings();
@@ -25,6 +28,7 @@ const state = {
   date: today(),
   events: new Map(),
   tasks: new Map(),
+  labels: new Map(),
   pending: false,
   sheetOpen: false, // task list on narrow screens
   showDone: false,
@@ -33,6 +37,7 @@ let store = null;
 let cloud = null;
 let unsubscribe = null;
 let demo = false; // design preview: sample data, nothing saved
+let refreshOpenDialog = null; // redraws an open labels dialog when data changes
 
 // Display settings are saved per device, except in the design preview.
 const persist = () => !demo && saveSettings(settings);
@@ -67,15 +72,18 @@ function start(s) {
   unsubscribe = store.subscribe((snap) => {
     state.events = snap.events;
     state.tasks = snap.tasks;
+    state.labels = snap.labels || new Map();
     state.pending = snap.pending;
     render();
+    refreshOpenDialog?.();
     if (first && store.kind === 'cloud') setTimeout(offerLocalCopy, 300);
     first = false;
   });
 }
 
 // Design preview: ?demo, optionally with &view=day|week|2week|month and
-// &show=tasks|event|new-event|delete|task|settings to open one part of the UI.
+// &show=tasks|event|deadline|new-event|create|delete|task|labels|settings to
+// open one part of the UI.
 async function startDemo(params) {
   demo = true;
   const { demoStore } = await import('./demo.js');
@@ -89,9 +97,12 @@ async function startDemo(params) {
       render();
       break;
     case 'event': editEventAt(id, date); break;
-    case 'new-event': newEventAt(s.samples.newEventDate, 10 * 60, 11 * 60); break;
+    case 'deadline': editEventAt(...s.samples.deadline); break;
+    case 'new-event': newEvent(s.samples.newEventDate, 10 * 60, 11 * 60); break;
+    case 'create': chooseAndCreate(innerWidth / 2 - 90, 160, { type: 'days', from: s.samples.newEventDate, to: s.samples.newEventDate, at: s.samples.newEventDate }); break;
     case 'delete': askScope('delete'); break;
     case 'task': editTask(s.samples.task); break;
+    case 'labels': manageLabels(); break;
     case 'settings': openSettings(); break;
   }
 }
@@ -119,7 +130,11 @@ function renderShell() {
     </div>
     <button class="icon-btn tasks-btn" data-action="toggle-tasks" aria-label="Tasks">${icons.tasks}<span class="badge" id="task-badge" hidden></span></button>
     <button class="icon-btn settings-btn" data-action="settings" aria-label="Settings">${icons.settings}<span class="sync-dot" id="sync-dot" hidden></span></button>
-    <button class="btn primary new-btn" data-action="new-event" aria-label="New event">${icons.plus}<span>New</span></button>
+    <div class="new-group" role="group" aria-label="New">
+      <button class="nb" data-action="new-event" title="New event (N)" aria-label="New event">${icons.event}<span>Event</span></button>
+      <button class="nb" data-action="new-deadline" title="New deadline" aria-label="New deadline">${icons.flagBtn}<span>Deadline</span></button>
+      <button class="nb" data-action="new-task" title="New task" aria-label="New task">${icons.task}<span>Task</span></button>
+    </div>
   </header>
   <div class="main">
     <section class="cal" id="cal"></section>
@@ -137,9 +152,11 @@ function renderShell() {
       <div class="tasks-list" id="task-list"></div>
     </aside>
   </div>
-  <div class="banner" id="banner" hidden></div>
-  <div class="toast" id="toast" role="status" hidden></div>`;
+  <div class="banner" id="banner" hidden></div>`;
 }
+
+// Month and 2-week views are grids of days; day and week are timelines.
+const isGrid = () => state.view === 'month' || state.view === '2week';
 
 function viewRange() {
   const d = state.date;
@@ -149,7 +166,7 @@ function viewRange() {
       return { from: d, to: addDays(d, 1), days: [d] };
     case '2week': {
       const s = startOfWeek(d, ws);
-      return { from: s, to: addDays(s, 14), days: daysFrom(s, 14) };
+      return { from: s, to: addDays(s, 14), gridFrom: s, gridTo: addDays(s, 14), weeks: 2 };
     }
     case 'month': {
       const s = startOfMonth(d);
@@ -187,6 +204,8 @@ function occurrencesIn(from, to) {
   return out;
 }
 
+const tasksIn = (from, to) => [...state.tasks.values()].filter((x) => x.due && x.due >= from && x.due < to);
+
 function render() {
   if (!store) return;
   const r = viewRange();
@@ -211,14 +230,18 @@ function renderCalendar(r, rangeChanged) {
   const old = cal.querySelector('.tg');
   const prev = old ? { top: old.scrollTop, left: old.scrollLeft } : null;
 
-  if (state.view === 'month') {
+  if (isGrid()) {
+    // How many item rows fit under the date in each cell.
+    const phone = innerWidth <= 760;
     const cellH = ((cal.clientHeight || 600) - 28) / r.weeks;
-    const chipLimit = Math.max(1, Math.floor((cellH - 26) / 19));
-    cal.innerHTML = renderMonth({ range: r, occs: occurrencesIn(r.gridFrom, r.gridTo), settings, chipLimit });
+    const rows = Math.max(1, Math.floor((cellH - (phone ? 29 : 30)) / (phone ? 17 : 19)));
+    cal.innerHTML = renderMonth({
+      range: r, occs: occurrencesIn(r.gridFrom, r.gridTo), tasks: tasksIn(r.gridFrom, r.gridTo), labels: state.labels, settings, rows, firstLabel: state.view === '2week',
+    });
     return;
   }
 
-  cal.innerHTML = renderTimeGrid({ days: r.days, occs: occurrencesIn(r.from, r.to), settings });
+  cal.innerHTML = renderTimeGrid({ days: r.days, occs: occurrencesIn(r.from, r.to), tasks: tasksIn(r.from, r.to), labels: state.labels, settings });
   const tg = cal.querySelector('.tg');
   if (prev) tg.scrollTop = prev.top;
   else if (!demo) {
@@ -244,22 +267,27 @@ function renderTasks(r, rangeChanged) {
     state.view === 'month' ? fmt(r.from, { month: 'long', year: 'numeric' })
       : state.view === 'day' ? fmt(r.from, { weekday: 'long', month: 'short', day: 'numeric' })
         : spanLabel(r.from, addDays(r.to, -1));
-  $('#task-list').innerHTML = renderTaskList({ tasks: state.tasks, from: r.from, to: r.to, h24: settings.h24, showDone: state.showDone });
+  $('#task-list').innerHTML = renderTaskList({ tasks: state.tasks, from: r.from, to: r.to, h24: settings.h24, showDone: state.showDone, labels: state.labels });
   // New tasks default to today if it's on screen, else the picked day.
   const due = $('#task-add').elements.due;
-  const inView = (d) => d >= r.from && d < r.to;
-  if (rangeChanged && document.activeElement !== due) due.value = inView(today()) ? today() : inView(state.date) ? state.date : r.from;
+  if (rangeChanged && document.activeElement !== due) due.value = defaultDay(r);
   const n = tasksInView(state.tasks, r.from, r.to).filter((x) => !x.done).length;
   const badge = $('#task-badge');
   badge.hidden = !n;
   badge.textContent = n > 99 ? '99+' : n;
 }
 
+// Today if it's on screen, else the picked day, else the first day shown.
+function defaultDay(r = viewRange()) {
+  const inView = (d) => d >= r.from && d < r.to;
+  return inView(today()) ? today() : inView(state.date) ? state.date : r.from;
+}
+
 // ---------------------------------------------------------------- Writes
 
-// Applies writes and, for deletes, offers to undo them.
+// Applies writes and, for deletes, offers to undo them. Resolves when saved.
 function commit(ops, undoLabel) {
-  if (!ops.length) return;
+  if (!ops.length) return Promise.resolve();
   const seen = new Set();
   const undo = [];
   for (const o of ops) {
@@ -269,7 +297,7 @@ function commit(ops, undoLabel) {
     const prev = state[o.coll].get(id);
     undo.push(prev ? { op: 'put', coll: o.coll, obj: prev } : { op: 'remove', coll: o.coll, id });
   }
-  Promise.resolve()
+  return Promise.resolve()
     .then(() => store.apply(ops))
     .then(() => undoLabel && toast(undoLabel, () => store.apply(undo)))
     .catch((err) => {
@@ -278,15 +306,34 @@ function commit(ops, undoLabel) {
     });
 }
 
-async function newEventAt(date, startMin, endMin) {
+const editorOptions = () => ({ settings, labels: () => state.labels, manageLabels });
+
+async function openNewEvent(over) {
+  const initial = { kind: 'event', title: '', notes: '', color: 'blue', labelId: null, shape: 'block', tentative: false, allDay: false, rrule: null, ...over };
+  const res = await eventEditor({ initial, isNew: true, repeating: false, ...editorOptions() });
+  if (res?.action === 'save') commit(saveOps(state.events, null, null, res.form, null));
+}
+
+// A new timed event on `date`; without times, the next whole hour today or
+// 9 AM (or when the day view starts) on other days.
+function newEvent(date, startMin, endMin) {
   if (startMin == null) {
-    // The next whole hour today, otherwise 9 AM (or when the day view starts).
     startMin = date === today() ? Math.min(Math.ceil((nowMin() + 1) / 60) * 60, 23 * 60) : Math.max(settings.dayStart * 60, 9 * 60);
     endMin = startMin + 60;
   }
-  const initial = { title: '', notes: '', color: 'blue', tentative: false, allDay: false, start: dt(date, startMin), end: dt(date, endMin ?? startMin + 60), rrule: null };
-  const res = await eventEditor({ initial, isNew: true, repeating: false, settings });
-  if (res?.action === 'save') commit(saveOps(state.events, null, null, res.form, null));
+  return openNewEvent({ start: dt(date, startMin), end: dt(date, endMin ?? startMin + 60) });
+}
+
+function newDeadline(date, min = DEADLINE_TIME) {
+  const at = dt(date, min);
+  return openNewEvent({ kind: 'deadline', start: at, end: at });
+}
+
+async function newTask(due, dueMin = null) {
+  const now = Date.now();
+  const task = { id: uid(), title: '', notes: '', due: due || null, dueTime: due && dueMin != null ? timeValue(dueMin) : null, labelId: null, color: null, done: false, doneAt: null, createdAt: now, updatedAt: now };
+  const res = await taskEditor(task, { isNew: true, ...editorOptions() });
+  if (res?.action === 'save') commit([{ op: 'put', coll: 'tasks', obj: { ...task, ...res.fields, doneAt: res.fields.done ? now : null } }]);
 }
 
 async function editEventAt(id, date) {
@@ -296,15 +343,16 @@ async function editEventAt(id, date) {
   // The editor shows this occurrence's own date and times.
   const k = diffDays(dateOf(ev.start), date);
   const initial = { ...ev, start: shiftDays(ev.start, k), end: shiftDays(ev.end, k), rrule: ev.rrule || master?.rrule || null };
-  const res = await eventEditor({ initial, isNew: false, repeating: isRepeating(state.events, ev), settings });
+  const res = await eventEditor({ initial, isNew: false, repeating: isRepeating(state.events, ev), ...editorOptions() });
   if (!res) return;
+  const what = ev.kind === 'deadline' ? 'Deadline' : 'Event';
   if (res.action === 'save') commit(saveOps(state.events, ev, date, res.form, res.scope));
-  else commit(deleteOps(state.events, ev, date, res.scope), res.scope && res.scope !== 'this' ? 'Events deleted' : 'Event deleted');
+  else commit(deleteOps(state.events, ev, date, res.scope), res.scope && res.scope !== 'this' ? `${what}s deleted` : `${what} deleted`);
 }
 
 function addTask(title, due) {
   const now = Date.now();
-  commit([{ op: 'put', coll: 'tasks', obj: { id: uid(), title, notes: '', due: due || null, dueTime: null, done: false, doneAt: null, createdAt: now, updatedAt: now } }]);
+  commit([{ op: 'put', coll: 'tasks', obj: { id: uid(), title, notes: '', due: due || null, dueTime: null, labelId: null, color: null, done: false, doneAt: null, createdAt: now, updatedAt: now } }]);
 }
 
 function toggleTask(id, done) {
@@ -315,11 +363,38 @@ function toggleTask(id, done) {
 async function editTask(id) {
   const t = state.tasks.get(id);
   if (!t) return;
-  const res = await taskEditor(t);
+  const res = await taskEditor(t, editorOptions());
   if (res?.action === 'save') {
     const doneAt = res.fields.done ? t.doneAt || Date.now() : null;
     commit([{ op: 'put', coll: 'tasks', obj: { ...t, ...res.fields, doneAt, updatedAt: Date.now() } }]);
   } else if (res?.action === 'delete') commit([{ op: 'remove', coll: 'tasks', id }], 'Task deleted');
+}
+
+// ---------------------------------------------------------------- Labels
+
+function manageLabels() {
+  return labelsDialog({
+    getLabels: () => state.labels,
+    usage: (id) => labelUsage(id, state.events, state.tasks),
+    act: labelAction,
+    bindRefresh: (fn) => (refreshOpenDialog = fn),
+  }).finally(() => (refreshOpenDialog = null));
+}
+
+function labelAction(type, p) {
+  const now = Date.now();
+  const label = state.labels.get(p.id);
+  switch (type) {
+    case 'add':
+      return commit([{ op: 'put', coll: 'labels', obj: { id: uid(), name: p.name, color: p.color, status: 'active', createdAt: now, updatedAt: now } }]);
+    case 'update':
+      return commit([{ op: 'put', coll: 'labels', obj: { ...label, name: p.name, color: p.color, updatedAt: now } }]);
+    case 'status':
+      return commit(setLabelStatusOps(label, p.status));
+    case 'delete':
+      return commit(deleteLabelOps(p.id, state.events, state.tasks), `Deleted “${label.name}” and its items`);
+  }
+  return Promise.resolve();
 }
 
 // ---------------------------------------------------------------- Navigation
@@ -356,7 +431,9 @@ const actions = {
   prev: () => move(-1),
   next: () => move(1),
   'toggle-tasks': toggleTasks,
-  'new-event': () => newEventAt(state.date),
+  'new-event': () => newEvent(state.date),
+  'new-deadline': () => newDeadline(defaultDay()),
+  'new-task': () => newTask(defaultDay()),
   'toggle-done': () => {
     state.showDone = !state.showDone;
     renderTasks(viewRange(), false);
@@ -369,9 +446,20 @@ const actions = {
   },
 };
 
-// ---------------------------------------------------------------- Input
+// ---------------------------------------------------------------- Creating by clicking or dragging
 
-let drag = null; // creating an event by clicking or dragging on the timeline
+// Clicking or dragging on the calendar selects a time range in one day column
+// (day and week views) or a run of days (month and 2-week cells, and the
+// all-day row), then asks what to make there. With a mouse, dragging starts
+// right away. On touch screens a drag scrolls as usual; hold for a moment
+// first to select instead, and a quick tap selects an hour.
+
+let sel = null; // { type: 'time', col, date, start, end } or { type: 'days', anchor, from, to, at }
+let mouseDown = false;
+let press = null; // a touch that may become a selection
+
+const ITEMS = '.ev, .dl, .tchip, .bar, .chip, .mchip, [data-goto], input, button, a';
+const surfaceAt = (target) => (target.closest(ITEMS) ? null : target.closest('.tg-col, .mv-cell, .ad-day'));
 
 function minuteAt(col, y) {
   const r = col.getBoundingClientRect();
@@ -379,36 +467,257 @@ function minuteAt(col, y) {
   return Math.min(settings.dayEnd * 60, Math.max(settings.dayStart * 60, m));
 }
 
-function drawGhost(d) {
-  const a = Math.floor(Math.min(d.start, d.end) / 15) * 15;
-  const b = Math.max(a + 15, Math.ceil(Math.max(d.start, d.end) / 15) * 15);
-  if (!d.ghost) {
-    d.ghost = document.createElement('div');
-    d.ghost.className = 'ghost';
-    d.col.append(d.ghost);
+// The range shown, on 15-minute steps, at least 15 minutes long.
+function drawGhost(s) {
+  const a = Math.floor(Math.min(s.start, s.end) / 15) * 15;
+  const b = Math.max(a + 15, Math.ceil(Math.max(s.start, s.end) / 15) * 15);
+  if (!s.ghost) {
+    s.ghost = document.createElement('div');
+    s.ghost.className = 'ghost';
+    s.col.append(s.ghost);
   }
   const ppm = settings.hourHeight / 60;
-  d.ghost.style.top = `${(a - settings.dayStart * 60) * ppm}px`;
-  d.ghost.style.height = `${(b - a) * ppm}px`;
+  s.ghost.style.top = `${(a - settings.dayStart * 60) * ppm}px`;
+  s.ghost.style.height = `${(b - a) * ppm}px`;
   return [a, b];
 }
+
+// The day cell under a point, among cells like `like` (same kind of cell).
+function dayAt(like, x, y) {
+  const kind = like.classList.contains('ad-day') ? '.ad-day' : '.mv-cell';
+  for (const c of app.querySelectorAll(kind)) {
+    const r = c.getBoundingClientRect();
+    if (x >= r.left && x < r.right && (kind === '.ad-day' || (y >= r.top && y < r.bottom))) return c;
+  }
+  return null;
+}
+
+function markDays() {
+  app.querySelectorAll('.mv-cell, .ad-day').forEach((c) => c.classList.toggle('sel', !!sel && sel.type === 'days' && c.dataset.date >= sel.from && c.dataset.date <= sel.to));
+}
+
+function beginSelection(surface, x, y) {
+  if (surface.classList.contains('tg-col')) {
+    const m = minuteAt(surface, y);
+    sel = { type: 'time', col: surface, date: surface.dataset.date, start: m, end: m, moved: false, x, y };
+  } else {
+    const d = surface.dataset.date;
+    sel = { type: 'days', cell: surface, anchor: d, from: d, to: d, at: d, moved: false, x, y };
+    markDays();
+  }
+}
+
+function extendSelection(x, y) {
+  if (!sel) return;
+  if (Math.abs(x - sel.x) > 6 || Math.abs(y - sel.y) > 6) sel.moved = true;
+  if (!sel.moved) return;
+  if (sel.type === 'time') {
+    sel.end = minuteAt(sel.col, y);
+    drawGhost(sel);
+  } else {
+    const d = dayAt(sel.cell, x, y)?.dataset.date;
+    if (!d) return;
+    sel.at = d;
+    [sel.from, sel.to] = d < sel.anchor ? [d, sel.anchor] : [sel.anchor, d];
+    markDays();
+  }
+}
+
+function clearSelection() {
+  sel?.ghost?.remove();
+  sel = null;
+  markDays();
+  stopAutoScroll();
+}
+
+// Keeps a timeline selection going past the top or bottom edge.
+let scrollTimer = 0;
+let lastPoint = null;
+function autoScroll(x, y) {
+  lastPoint = [x, y];
+  if (scrollTimer || sel?.type !== 'time') return;
+  const step = () => {
+    scrollTimer = 0;
+    const tg = $('.tg');
+    if (!sel || !tg) return;
+    const [px, py] = lastPoint;
+    const top = tg.querySelector('.tg-allday').getBoundingClientRect().bottom;
+    const bottom = tg.getBoundingClientRect().bottom;
+    const dy = py < top + 28 ? -10 : py > bottom - 28 ? 10 : 0;
+    if (!dy) return;
+    tg.scrollTop += dy;
+    extendSelection(px, py);
+    scrollTimer = requestAnimationFrame(step);
+  };
+  scrollTimer = requestAnimationFrame(step);
+}
+function stopAutoScroll() {
+  cancelAnimationFrame(scrollTimer);
+  scrollTimer = 0;
+}
+
+async function finishSelection(x, y) {
+  stopAutoScroll();
+  const s = sel;
+  if (!s) return;
+  if (s.type === 'time' && !s.moved) {
+    // A click (or tap) selects the hour from the half hour before.
+    s.start = Math.floor(s.start / 30) * 30;
+    s.end = Math.min(s.start + 60, settings.dayEnd * 60);
+    s.end = Math.max(s.end, s.start + 15);
+  }
+  await chooseAndCreate(x, y, s);
+}
+
+// Asks what to make for selection `s`, then opens that editor. A deadline or
+// task goes where the pointer was let go.
+async function chooseAndCreate(x, y, s) {
+  sel = s;
+  let heading;
+  let make;
+  let when = '';
+  if (s.type === 'time') {
+    const [a, b] = drawGhost(s);
+    const at = s.moved ? Math.round(Math.min(Math.max(s.end, settings.dayStart * 60), 1439) / 15) * 15 : a;
+    heading = `${fmt(s.date, { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtTimeRange(a, b, settings.h24)}`;
+    make = {
+      event: () => newEvent(s.date, a, b),
+      deadline: () => newDeadline(s.date, Math.min(at, 1439)),
+      task: () => newTask(s.date, Math.min(at, 1439)),
+    };
+    when = fmtTime(Math.min(at, 1439), settings.h24);
+  } else {
+    markDays();
+    const one = s.from === s.to;
+    heading = one ? fmt(s.from, { weekday: 'short', month: 'short', day: 'numeric' }) : spanLabel(s.from, s.to);
+    make = {
+      event: () => openNewEvent({ allDay: true, start: s.from, end: s.to }),
+      deadline: () => newDeadline(s.at),
+      task: () => newTask(s.at),
+    };
+  }
+  const atDay = s.type === 'days' && s.from !== s.to ? ` · ${fmt(s.at, { month: 'short', day: 'numeric' })}` : '';
+  const choice = await createMenu({
+    x,
+    y,
+    heading,
+    choices: [
+      ['event', icons.event, s.type === 'days' ? 'All-day event' : 'Event'],
+      ['deadline', icons.flagBtn, `Deadline${s.type === 'time' ? ` · ${when}` : atDay}`],
+      ['task', icons.task, `Task${s.type === 'time' ? ` · ${when}` : atDay}`],
+    ],
+  });
+  clearSelection();
+  if (choice) make[choice]();
+}
+
+function wireGestures() {
+  // Mouse and pen: press, drag, let go.
+  app.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0 || sel) return;
+    const surface = surfaceAt(e.target);
+    if (!surface) return;
+    beginSelection(surface, e.clientX, e.clientY);
+    mouseDown = true;
+    surface.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  app.addEventListener('pointermove', (e) => {
+    if (!mouseDown) return;
+    extendSelection(e.clientX, e.clientY);
+    autoScroll(e.clientX, e.clientY);
+  });
+  app.addEventListener('pointerup', (e) => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    finishSelection(e.clientX, e.clientY);
+  });
+  app.addEventListener('pointercancel', () => {
+    if (!mouseDown) return;
+    mouseDown = false;
+    clearSelection();
+  });
+
+  // Touch: tap, or hold and then drag. Moving before the hold is up scrolls.
+  const cancelPress = () => {
+    if (press) clearTimeout(press.timer);
+    press = null;
+  };
+  app.addEventListener('touchstart', (e) => {
+    cancelPress();
+    if (e.touches.length !== 1 || sel) return;
+    const surface = surfaceAt(e.target);
+    if (!surface) return;
+    const t = e.touches[0];
+    const p = { surface, x: t.clientX, y: t.clientY, lx: t.clientX, ly: t.clientY, t: Date.now(), active: false };
+    p.timer = setTimeout(() => {
+      p.active = true;
+      beginSelection(surface, p.x, p.y);
+      sel.moved = true; // a held finger selects from where it is
+      if (sel.type === 'time') {
+        sel.end = sel.start + 15;
+        drawGhost(sel);
+      }
+      navigator.vibrate?.(10);
+    }, LONG_PRESS_MS);
+    press = p;
+  }, { passive: true });
+  app.addEventListener('touchmove', (e) => {
+    if (!press) return;
+    const t = e.touches[0];
+    if (!press.active) {
+      if (Math.abs(t.clientX - press.x) > 8 || Math.abs(t.clientY - press.y) > 8) cancelPress(); // it's a scroll
+      return;
+    }
+    e.preventDefault(); // keep the page still while selecting
+    press.lx = t.clientX;
+    press.ly = t.clientY;
+    extendSelection(t.clientX, t.clientY);
+    autoScroll(t.clientX, t.clientY);
+  }, { passive: false });
+  app.addEventListener('touchend', (e) => {
+    const p = press;
+    cancelPress();
+    if (!p) return;
+    if (p.active) {
+      e.preventDefault(); // no click afterwards
+      finishSelection(p.lx, p.ly);
+    } else if (Date.now() - p.t < LONG_PRESS_MS) {
+      e.preventDefault();
+      beginSelection(p.surface, p.x, p.y);
+      finishSelection(p.x, p.y);
+    }
+  }, { passive: false });
+  app.addEventListener('touchcancel', () => {
+    const active = press?.active;
+    cancelPress();
+    if (active) clearSelection();
+  });
+  // A long press would otherwise bring up the browser's menu.
+  app.addEventListener('contextmenu', (e) => {
+    if (press?.active || sel || surfaceAt(e.target)) e.preventDefault();
+  });
+}
+
+// ---------------------------------------------------------------- Input
 
 function wireEvents() {
   app.addEventListener('click', (e) => {
     const t = e.target;
+    if (t.matches('[data-toggle]')) return; // ticking a task off is handled on change
     const act = t.closest('[data-action]');
     if (act) return actions[act.dataset.action]?.();
     const view = t.closest('[data-view]');
     if (view) return setView(view.dataset.view);
     const ev = t.closest('[data-id][data-date]');
     if (ev) return editEventAt(ev.dataset.id, ev.dataset.date);
+    const task = t.closest('[data-task], [data-edit-task]');
+    if (task) return editTask(task.dataset.task || task.dataset.editTask);
     const go = t.closest('[data-goto]');
     if (go) {
       state.date = go.dataset.goto;
       return setView('day');
     }
-    const task = t.closest('[data-edit-task]');
-    if (task) return editTask(task.dataset.editTask);
     if (t.id === 'jump') openDatePicker();
   });
 
@@ -438,45 +747,10 @@ function wireEvents() {
     }
   });
 
-  app.addEventListener('pointerdown', (e) => {
-    const col = e.target.closest('.tg-col');
-    if (!col || e.target.closest('.ev') || e.button !== 0) return;
-    const m = minuteAt(col, e.clientY);
-    drag = { col, date: col.dataset.date, start: m, end: m, x: e.clientX, y: e.clientY, t: Date.now(), touch: e.pointerType !== 'mouse', moved: false };
-    if (!drag.touch) {
-      col.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    }
-  });
-  app.addEventListener('pointermove', (e) => {
-    if (!drag) return;
-    if (Math.abs(e.clientY - drag.y) > 6 || Math.abs(e.clientX - drag.x) > 6) drag.moved = true;
-    if (drag.touch || !drag.moved) return; // on touch screens, moving scrolls
-    drag.end = minuteAt(drag.col, e.clientY);
-    drawGhost(drag);
-  });
-  app.addEventListener('pointerup', () => {
-    if (!drag) return;
-    const d = drag;
-    drag = null;
-    if (d.touch && (d.moved || Date.now() - d.t > 600)) return;
-    let a;
-    let b;
-    if (d.moved && !d.touch) [a, b] = drawGhost(d);
-    else {
-      a = Math.floor(d.start / 30) * 30;
-      b = a + 60;
-    }
-    d.ghost?.remove();
-    newEventAt(d.date, a, b);
-  });
-  app.addEventListener('pointercancel', () => {
-    drag?.ghost?.remove();
-    drag = null;
-  });
+  wireGestures();
 
   document.addEventListener('keydown', (e) => {
-    if (!store || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open]')) return;
+    if (!store || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open], .cm-scrim')) return;
     if (e.target.closest('input, textarea, select, [contenteditable]')) return;
     const keys = {
       t: actions.today, ArrowLeft: actions.prev, ArrowRight: actions.next, n: actions['new-event'],
@@ -494,22 +768,22 @@ function wireEvents() {
   addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (!store) return;
+      if (!store || sel) return;
       const r = viewRange();
       $('#range-title').textContent = rangeTitle(r);
-      if (state.view === 'month' || innerWidth !== lastW) renderCalendar(r, false);
+      if (isGrid() || innerWidth !== lastW) renderCalendar(r, false);
       lastW = innerWidth;
     }, 150);
   });
 
   // Keep "now" and "today" current.
   const tick = () => {
-    if (!store || document.hidden || drag) return;
+    if (!store || document.hidden || sel || press) return;
     if (today() !== lastToday) {
       if (state.date === lastToday) state.date = today();
       lastToday = today();
       render();
-    } else if (state.view !== 'month') renderCalendar(viewRange(), false);
+    } else if (!isGrid()) renderCalendar(viewRange(), false);
   };
   setInterval(tick, 60000);
   document.addEventListener('visibilitychange', tick);
@@ -528,11 +802,19 @@ function openDatePicker() {
 
 // ---------------------------------------------------------------- Messages
 
+// Shown above any open dialog, so Undo can be reached from inside one.
 let toastTimer;
 function toast(message, undo) {
-  const t = $('#toast');
-  if (!t) return;
-  t.innerHTML = `<span>${esc(message)}</span>${undo ? '<button class="toast-btn">Undo</button>' : ''}`;
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.className = 'toast';
+    t.setAttribute('role', 'status');
+  }
+  const host = [...document.querySelectorAll('dialog[open]')].pop() || document.body;
+  if (t.parentNode !== host) host.append(t);
+  t.innerHTML = `<span>${esc(message)}</span>${undo ? '<button type="button" class="toast-btn">Undo</button>' : ''}`;
   t.hidden = false;
   t.querySelector('.toast-btn')?.addEventListener('click', () => {
     undo();
@@ -568,6 +850,7 @@ function openSettings() {
     settings,
     sync: { kind: store.kind, email: store.email },
     lastBackup: readJSON(BACKUP_KEY, {}).last,
+    labels: () => state.labels,
     onChange: (changes) => {
       settings = { ...settings, ...changes };
       if (settings.dayEnd <= settings.dayStart) settings.dayEnd = Math.min(24, settings.dayStart + 1);
@@ -576,15 +859,16 @@ function openSettings() {
     },
     actions: {
       backup: doBackup,
-      ics: () => saveFile('planner-events.ics', icsFile(state.events), 'text/calendar'),
+      ics: () => saveFile('planner-events.ics', icsFile(state.events, state.labels), 'text/calendar'),
       restore: restoreBackup,
+      labels: manageLabels,
       signOut: () => cloud?.signOut(),
     },
   });
 }
 
 async function doBackup() {
-  const { name, text } = backupFile(state.events, state.tasks);
+  const { name, text } = backupFile(state.events, state.tasks, state.labels);
   if (await saveFile(name, text, 'application/json')) {
     writeJSON(BACKUP_KEY, { ...readJSON(BACKUP_KEY, {}), last: Date.now() });
     updateBanner();
@@ -600,11 +884,13 @@ function restoreBackup(text) {
     return toast(err.message);
   }
   const when = data.exportedAt ? ` from ${new Date(data.exportedAt).toLocaleDateString()}` : '';
-  const ok = confirm(`Restore ${data.events.length} events and ${data.tasks.length} tasks${when}?\n\nItems in the backup replace their current versions. Anything added since the backup stays.`);
+  const labels = data.labels.length ? `, ${data.tasks.length} tasks and ${data.labels.length} labels` : ` and ${data.tasks.length} tasks`;
+  const ok = confirm(`Restore ${data.events.length} events${labels}${when}?\n\nItems in the backup replace their current versions. Anything added since the backup stays.`);
   if (!ok) return;
   commit([
     ...data.events.map((obj) => ({ op: 'put', coll: 'events', obj })),
     ...data.tasks.map((obj) => ({ op: 'put', coll: 'tasks', obj })),
+    ...data.labels.map((obj) => ({ op: 'put', coll: 'labels', obj })),
   ], 'Backup restored');
 }
 
@@ -616,11 +902,13 @@ function offerLocalCopy() {
   const local = readLocalData();
   const events = Object.values(local.events);
   const tasks = Object.values(local.tasks);
+  const labels = Object.values(local.labels);
   if (!events.length && !tasks.length) return;
   if (confirm(`This device has ${events.length} events and ${tasks.length} tasks from before sync was turned on. Copy them to your account?`)) {
     commit([
       ...events.map((obj) => ({ op: 'put', coll: 'events', obj })),
       ...tasks.map((obj) => ({ op: 'put', coll: 'tasks', obj })),
+      ...labels.map((obj) => ({ op: 'put', coll: 'labels', obj })),
     ]);
   }
 }

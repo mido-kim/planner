@@ -2,13 +2,13 @@ import { addDays } from './dates.js';
 import { toRRule } from './recurrence.js';
 import { isIOS } from './util.js';
 
-// Backups (.json, everything, restorable here) and .ics export (events only,
-// opens in Google Calendar, Apple Calendar, Outlook and others).
+// Backups (.json, everything, restorable here) and .ics export (events and
+// deadlines, opens in Google Calendar, Apple Calendar, Outlook and others).
 
-export function backupFile(events, tasks) {
+export function backupFile(events, tasks, labels = new Map()) {
   const now = new Date();
   const text = JSON.stringify(
-    { app: 'planner', version: 1, exportedAt: now.toISOString(), events: [...events.values()], tasks: [...tasks.values()] },
+    { app: 'planner', version: 1, exportedAt: now.toISOString(), events: [...events.values()], tasks: [...tasks.values()], labels: [...labels.values()] },
     null,
     1,
   );
@@ -27,7 +27,10 @@ export function parseBackup(text) {
   }
   const okEvent = (e) => e && typeof e.id === 'string' && typeof e.start === 'string' && typeof e.end === 'string';
   const okTask = (t) => t && typeof t.id === 'string' && typeof t.title === 'string';
-  return { exportedAt: d.exportedAt, events: d.events.filter(okEvent), tasks: d.tasks.filter(okTask) };
+  const okLabel = (l) => l && typeof l.id === 'string' && typeof l.name === 'string';
+  // Backups from before 0.3.0 have no labels.
+  const labels = Array.isArray(d.labels) ? d.labels.filter(okLabel) : [];
+  return { exportedAt: d.exportedAt, events: d.events.filter(okEvent), tasks: d.tasks.filter(okTask), labels };
 }
 
 const text = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
@@ -55,7 +58,7 @@ function fold(line) {
   return out.join('\r\n ');
 }
 
-export function icsFile(events) {
+export function icsFile(events, labels = new Map()) {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
   const all = [...events.values()];
   const series = new Map(all.filter((e) => e.rrule).map((e) => [e.id, e]));
@@ -67,9 +70,10 @@ export function icsFile(events) {
       `UID:${master ? master.id : ev.id}@planner`,
       `DTSTAMP:${stamp}`,
       prop('DTSTART', ev.start, ev.allDay),
-      // All-day end dates are exclusive in iCalendar.
-      prop('DTEND', ev.allDay ? addDays(ev.end, 1) : ev.end, ev.allDay),
     );
+    // All-day end dates are exclusive in iCalendar. A deadline has no end, which
+    // iCalendar reads as an event that takes no time.
+    if (ev.kind !== 'deadline') lines.push(prop('DTEND', ev.allDay ? addDays(ev.end, 1) : ev.end, ev.allDay));
     if (master) {
       lines.push(prop('RECURRENCE-ID', master.allDay ? ev.originalDate : ev.originalDate + master.start.slice(10), master.allDay));
     }
@@ -84,6 +88,8 @@ export function icsFile(events) {
     if (ev.tentative) lines.push('STATUS:TENTATIVE');
     lines.push(`SUMMARY:${text(ev.title || '(No title)')}`);
     if (ev.notes) lines.push(`DESCRIPTION:${text(ev.notes)}`);
+    const label = ev.labelId && labels.get(ev.labelId);
+    if (label) lines.push(`CATEGORIES:${text(label.name)}`);
     lines.push('END:VEVENT');
   }
   lines.push('END:VCALENDAR');

@@ -3,16 +3,24 @@
 A personal calendar and task planner that runs in the browser and installs like
 an app on a PC (Chrome) and an iPhone (Safari).
 
-- **Day, Week, 2 Weeks and Month views.** In the first three, events sit on a
+- **Day, Week, 2 Weeks and Month views.** In Day and Week, events sit on a
   timeline at their start time and are as tall as they are long. Overlapping
-  events share the column.
+  events share the column. 2 Weeks and Month are grids of days.
+- **Events, deadlines and tasks.** Click or drag on the calendar (on a phone:
+  tap, or hold and drag) and pick what to make, or use the three buttons at the
+  top. A deadline is a single moment, drawn as a line across its day.
+- **All-day and multi-day events** stretch across their days as a block, a line
+  with arrowheads, or a plain line.
+- **Labels** (e.g. Research, Teaching) color their events, deadlines and tasks.
+  Retire a label to hide it, or delete it together with its items.
 - **Repeating events:** daily, weekly (any weekdays), every weekday, monthly
   (by date, or "second Tuesday" / "last Friday"), yearly, every N days, weeks,
   months or years. A repeat can end never, on a date, or after N times.
 - **Edit or delete** one occurrence, this and following, or all events, with
   Undo after deleting.
 - **Tasks** beside the calendar, showing what's due in the dates on screen,
-  plus overdue tasks and tasks with no date.
+  plus overdue tasks and tasks with no date. Tasks with a date also show on
+  the calendar, with a tick box.
 - **Works offline.** Optional sync between devices through Firebase.
 - **Your data stays portable:** JSON backups that restore into this app, and
   `.ics` export that opens in Google Calendar, Apple Calendar and Outlook.
@@ -31,7 +39,7 @@ python -m http.server 5173
 Then open http://localhost:5173. Without sync turned on, everything is saved in
 that browser only.
 
-Logic tests (repeat rules, edit/delete options, export) live at
+Logic tests (repeat rules, edit/delete options, labels, export) live at
 http://localhost:5173/tests/.
 
 ## Turn on sync (Firebase, free)

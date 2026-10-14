@@ -8,11 +8,16 @@ and setup, CHANGELOG.md for history.
 ## Map
 
 - `js/main.js`: startup, layout shell, `render()`, navigation, input (clicks,
-  drag-to-create, keyboard), toasts, settings/backup actions, sign-in screen.
-- `js/views/timegrid.js` (day/week/2-week timeline), `js/views/month.js`,
+  click/drag-to-create with the create menu, touch long-press, keyboard),
+  toasts, label actions, settings/backup actions, sign-in screen.
+- `js/views/timegrid.js` (day/week timeline, with deadlines as lines and
+  tasks as chips), `js/views/month.js` (month and 2-week grids),
+  `js/views/bars.js` (lanes for all-day/multi-day bars and their shapes),
   `js/views/tasks.js`: each returns an HTML string; `main.js` puts it in place.
-- `js/dialogs.js`: event editor (repeat presets + custom), scope dialog,
-  task editor, settings.
+- `js/labels.js`: label colors, usage, retire and delete (as write ops).
+- `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
+  label picker), scope dialog, task editor, labels manager, create menu,
+  settings.
 - `js/recurrence.js`: repeat rules: `occurrenceDates`, `expand`,
   `describeRule`, `toRRule`. `js/series.js`: this/following/all edits and
   deletes, returned as write ops.
@@ -38,15 +43,22 @@ layer opacity.
 
 ## Data
 
-Event: `{ id, title, notes, color, tentative, allDay, start, end, rrule,
-exdates, seriesId, originalDate, createdAt, updatedAt }`. All-day `end` is the
-inclusive last date. Times are floating (no time zone). A changed occurrence is
-its own event with `seriesId` + `originalDate`, and its date is in the
-series' `exdates`.
+Event: `{ id, kind, title, notes, labelId, color, shape, tentative, allDay,
+start, end, rrule, exdates, seriesId, originalDate, createdAt, updatedAt }`.
+`kind` is 'event' or 'deadline' (a deadline has `end === start`). `shape` is
+'block' | 'arrow' | 'line' (bars only). All-day `end` is the inclusive last
+date. Times are floating (no time zone). A changed occurrence is its own event
+with `seriesId` + `originalDate`, and its date is in the series' `exdates`.
 
-Task: `{ id, title, notes, due, dueTime, done, doneAt, createdAt, updatedAt }`.
+Task: `{ id, title, notes, due, dueTime, labelId, color, done, doneAt,
+createdAt, updatedAt }`.
 
-Firestore paths: `users/{uid}/events/{id}`, `users/{uid}/tasks/{id}`.
+Label: `{ id, name, color, status: 'active' | 'retired', createdAt, updatedAt }`.
+An item's `color` is null when it follows its label (`colorOf` in labels.js).
+Missing fields mean their default (older data has none of the new ones).
+
+Firestore paths: `users/{uid}/events/{id}`, `users/{uid}/tasks/{id}`,
+`users/{uid}/labels/{id}`.
 Display settings are per device in localStorage (`js/settings.js`).
 
 ## Working here

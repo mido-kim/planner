@@ -1,3 +1,5 @@
+const FLAG = '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5z" fill="currentColor"/>';
+
 const svg = (paths, size = 20) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 
@@ -13,4 +15,10 @@ export const icons = {
   down: svg('<path d="M12 5v14M19 12l-7 7-7-7"/>', 11),
   cloud: svg('<path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.34 9.5 4.75 4.75 0 0 0 7 19z"/>', 16),
   device: svg('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>', 16),
+  flag: svg(FLAG, 11),
+  flagBtn: svg(FLAG, 16),
+  event: svg('<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M12 10.5v7M8.5 14h7"/>', 16),
+  task: svg('<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>', 16),
+  pencil: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>', 16),
+  tag: svg('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>', 16),
 };
