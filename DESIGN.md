@@ -29,7 +29,9 @@ touch the code.
   (Figma's connector can't use Arial itself). The app uses Arial, with Apple SD
   Gothic Neo (iPhone) or Malgun Gothic (Windows) for Korean.
 
-Month view, the task sheet and the settings screen aren't rebuilt yet. Ask
+Not drawn in Figma yet: the agenda panel (right / bottom, and the phone's
+lower half), the 2-week timelines, the month view and Settings. Colors are
+up to date (the Gelato Days pastels). Ask
 Claude to add any screen you want to redesign.
 
 ## The loop
