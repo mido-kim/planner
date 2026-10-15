@@ -25,6 +25,9 @@ an app on a PC (Chrome) and an iPhone (Safari).
   it fills the lower half of the screen. Tasks with a date also show on the
   calendar, with a tick box.
 - **Gelato colors:** soft pastel colors throughout, in light and dark mode.
+- **Drag to move** events, deadlines and tasks to another time or day.
+- **Korean public holidays** (2026–2031) built in; working hours are lightly
+  shaded on the other weekdays.
 - **Works offline.** Optional sync between devices through Firebase.
 - **Your data stays portable:** JSON backups that restore into this app, and
   `.ics` export that opens in Google Calendar, Apple Calendar and Outlook.
@@ -45,6 +48,20 @@ that browser only.
 
 Logic tests (repeat rules, edit/delete options, labels, export) live at
 http://localhost:5173/tests/.
+
+## Use a different font
+
+The app uses Arial. To use a font you downloaded instead:
+
+1. Check its license allows use on a website ("web font" or OFL; most free
+   Korean fonts such as Pretendard and Nanum do).
+2. Get it as `.woff2` files if you can (much smaller than `.ttf`/`.otf`).
+   Korean fonts are large, so one regular and one bold weight is plenty.
+3. Put the files in a `fonts` folder here, and ask Claude to switch the app to
+   them. It adds them to `css/app.css` (`@font-face`) and to `sw.js` so they
+   work offline. Fonts that are on a font CDN (like Pretendard) need no files:
+   just give Claude the font's name.
+4. For Figma, install the font on your PC (double-click the file, Install).
 
 ## Turn on sync (Firebase, free)
 
@@ -123,6 +140,7 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 | `js/views/timegrid.js` | Day / week timeline and the 2-week view |
 | `js/views/month.js` | Month grid |
 | `js/views/agenda.js` | Agenda (events, deadlines and tasks with details) |
+| `js/holidays.js` | Korean public holidays, 2026–2031 |
 | `js/dialogs.js` | Event, task, repeat-scope and settings dialogs |
 | `js/recurrence.js` | Repeat rules: occurrence dates, descriptions, iCalendar RRULE |
 | `js/series.js` | "This / this and following / all" edits and deletes |

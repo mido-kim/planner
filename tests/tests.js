@@ -2,10 +2,11 @@ import { backupFile, icsFile, parseBackup } from '../js/backup.js';
 import { addDays, diffDays, fmtTimeRange, weekday } from '../js/dates.js';
 import { activeLabels, colorOf, deleteLabelOps, labelUsage, retiredLabels, setLabelStatusOps } from '../js/labels.js';
 import { alignStart, describeRule, expand, occurrenceDates, toRRule } from '../js/recurrence.js';
-import { deleteOps, saveOps } from '../js/series.js';
+import { deleteOps, moveOps, saveOps } from '../js/series.js';
+import { HOLIDAYS } from '../js/holidays.js';
 import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
-import { isBarEvent, placeAt, taskPlace } from '../js/views/timegrid.js';
+import { isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
 
 const results = [];
 function test(name, fn) {
@@ -314,6 +315,66 @@ test('agenda: overdue first, then each day in time order, date-only tasks last, 
   eq(ids(groups[2]), ['trip', 'due', 'meet', 'nine', 'any']);
   eq(ids(groups[3]), ['free']);
   eq(hiddenDone, 1);
+});
+
+// ---- the day running past midnight
+test('day end at 2 AM: the small hours belong to the day before', () => {
+  eq(slotOf('2026-10-15', 30, 26 * 60), { day: '2026-10-14', min: 1470 });
+  eq(slotOf('2026-10-15', 150, 26 * 60), { day: '2026-10-15', min: 150 });
+  eq(slotOf('2026-10-15', 30, 24 * 60), { day: '2026-10-15', min: 30 });
+});
+test('day end at 2 AM: a 12:30 AM event sits at the bottom of the day before', () => {
+  const late = ev({ id: 'night', start: '2026-10-15T00:30', end: '2026-10-15T01:30' });
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workStart: 10, workEnd: 21 };
+  const html = renderTimeGrid({ days: ['2026-10-14', '2026-10-15'], occs: expand(late, '2026-10-14', '2026-10-16'), settings });
+  const cols = html.split('class="tg-col').slice(1);
+  if (!cols[0].includes('data-id="night"') || !cols[0].includes('top:525px')) throw new Error('not at 12:30 AM in the first column');
+  if (cols[1].includes('data-id="night"')) throw new Error('also shown on its own date');
+});
+test('day end at 2 AM: shown as an early chip when the day before is not on screen', () => {
+  const late = ev({ id: 'night', start: '2026-10-15T00:30', end: '2026-10-15T01:30' });
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workStart: 10, workEnd: 21 };
+  const html = renderTimeGrid({ days: ['2026-10-15'], occs: expand(late, '2026-10-15', '2026-10-16'), settings });
+  if (!/chip[^"]*oor[^>]*data-id="night"/.test(html)) throw new Error('no early chip');
+});
+
+// ---- holidays and working hours
+test('holidays: substitutes, lunar dates in Korea time, 노동절 and 제헌절', () => {
+  for (const d of ['2026-12-25', '2027-02-07', '2027-02-09', '2027-05-03', '2027-07-19', '2028-10-05', '2029-09-24', '2030-02-05', '2031-03-03']) {
+    if (!HOLIDAYS[d]) throw new Error(`missing ${d}`);
+  }
+  if (HOLIDAYS['2027-02-05']) throw new Error('설날 2027 is Feb 7 in Korea, so Feb 5 is a working day');
+});
+test('working hours: shaded on weekdays, not on holidays or weekends', () => {
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: true, workStart: 10, workEnd: 21 };
+  const days = ['2026-12-24', '2026-12-25', '2026-12-26'];
+  const cols = renderTimeGrid({ days, occs: [], settings }).split('class="tg-col').slice(1);
+  eq(cols.map((c) => c.includes('class="work"')), [true, false, false]);
+  if (!cols[0].includes('top:90px;height:330px')) throw new Error('band should run 10 AM to 9 PM');
+});
+
+// ---- moving by dragging
+test('move: an event an hour and a half later', () => {
+  const [o] = puts(moveOps(map(ev()), ev(), '2026-10-12', 90, null));
+  eq([o.start, o.end], ['2026-10-12T10:30', '2026-10-12T11:30']);
+});
+test('move: an all-day event two days later', () => {
+  const e = ev({ allDay: true, start: '2026-10-12', end: '2026-10-13' });
+  const [o] = puts(moveOps(map(e), e, '2026-10-12', 2 * 1440, null));
+  eq([o.start, o.end], ['2026-10-14', '2026-10-15']);
+});
+test('move: one occurrence of a weekly series', () => {
+  const ops = moveOps(map(weekly), weekly, '2026-10-19', 60, 'this');
+  const [m, d] = puts(ops);
+  eq([m.exdates, d.start, d.seriesId, d.rrule], [['2026-10-19'], '2026-10-19T10:00', 'm', null]);
+});
+test('move: a whole weekly series a day later moves its weekday too', () => {
+  const [m] = puts(moveOps(map(weekly), weekly, '2026-10-19', 1440, 'all'));
+  eq([m.start, m.rrule.byWeekday], ['2026-10-13T09:00', [2]]);
+});
+test('.ics export: a deadline with no time is a date', () => {
+  const ics = icsFile(map({ ...deadline, allDay: true, start: '2026-10-14', end: '2026-10-14' }));
+  if (!ics.includes('DTSTART;VALUE=DATE:20261014') || ics.includes('DTEND')) throw new Error('wrong date-only deadline');
 });
 
 // ---- report

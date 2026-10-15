@@ -116,6 +116,10 @@ dark-mode block.
 | Grid lines | hour: 1px line color; half-hour: 1px softer line |
 | Event block | 6px corners, solid pastel fill with its dark ink for text (dark mode: 30% of the pastel, pastel text), no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
 | Tentative event | 30% of the pastel, 1.5px dashed outline |
+| Working hours | 10 AM – 9 PM on weekdays that aren't public holidays: a 4% warm gray over the column (3% white in dark mode) |
+| Holidays | Date number in the danger red; name as a tooltip |
+| Text that doesn't fit | Cut where its box ends and faded over its last ~2 letters (never "…"); titles of several lines fade along their last line |
+| Moving | The item dims to 40%; a pink ghost with the new time shows where it lands; day moves tint the target days |
 | 2-week view | Two week rows; 30px day header, all-day strip (16px bars), then a timeline squeezed to fit; labels every 3 hours; blocks show the title only |
 | Event bar (all-day row) | 20px tall (18 in month, 16 phone), 5px corners, 11.5px text; Block = solid color, Arrows/Line = 2px line with the title in the middle, 8 × 10px arrowheads |
 | Deadline | 2px line across the day; title tag 16px tall, 10.5px bold white text on the color, 4px corners (square where it meets the line) |

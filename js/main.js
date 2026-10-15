@@ -1,13 +1,14 @@
 import { backupFile, icsFile, parseBackup, saveFile } from './backup.js';
 import { firebaseConfig } from './config.js';
 import {
-  addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, fmtTime, fmtTimeRange, nowMin, parts, shiftDays, startOfMonth, startOfWeek, timeValue, today,
+  absMin, addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, fmtTime, fmtTimeRange, fromAbsMin, nowMin, parseTime, parts, shiftDays, startOfMonth,
+  startOfWeek, timeValue, today,
 } from './dates.js';
 import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, taskEditor } from './dialogs.js';
 import { icons } from './icons.js';
 import { deleteLabelOps, labelUsage, setLabelStatusOps } from './labels.js';
-import { expand } from './recurrence.js';
-import { deleteOps, isRepeating, masterOf, saveOps } from './series.js';
+import { expand, spanDays } from './recurrence.js';
+import { deleteOps, isRepeating, masterOf, moveOps, saveOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
 import { $, esc, readJSON, uid, writeJSON } from './util.js';
@@ -218,6 +219,7 @@ function render() {
   const rangeChanged = key !== lastRangeKey;
   lastRangeKey = key;
   $('#range-title').textContent = rangeTitle(r);
+  fitText($('.title-wrap'));
   $('#jump').value = state.date;
   app.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.view === state.view));
   applyLayout();
@@ -231,6 +233,34 @@ function render() {
 }
 
 function renderCalendar(r, rangeChanged, occs) {
+  drawCalendar(r, rangeChanged, occs);
+  fitText($('#cal'));
+}
+
+// Text that doesn't fit is cut where the box ends rather than shortened with
+// "…", and fades out toward its end, so the last letters still show. One-line
+// texts fade at the right; titles of several lines fade along their last line.
+const ONE_LINE = '.ev.short .ev-t, .bar-t, .ct, .tk-t, .mtt, .range-title';
+function fitText(root) {
+  if (!root) return;
+  for (const el of root.querySelectorAll('.ev:not(.short) .ev-t')) {
+    el.style.maxHeight = '';
+    // A word too long for a narrow box fades at the right edge; text with
+    // more lines than fit fades along its last line.
+    const wide = el.scrollWidth > el.clientWidth + 1;
+    const tall = el.scrollHeight > el.clientHeight + 1;
+    el.classList.toggle('fade', wide);
+    el.classList.toggle('fade-last', tall && !wide);
+    if (!tall) continue;
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 15;
+    const lines = Math.max(1, Math.floor((el.clientHeight + 1) / lh));
+    el.style.maxHeight = `${lines * lh}px`;
+    el.style.setProperty('--lh', `${lh}px`);
+  }
+  for (const el of root.querySelectorAll(ONE_LINE)) el.classList.toggle('fade', el.scrollWidth > el.clientWidth + 1);
+}
+
+function drawCalendar(r, rangeChanged, occs) {
   const cal = $('#cal');
   const old = cal.querySelector('.tg');
   const prev = old ? { top: old.scrollTop, left: old.scrollLeft } : null;
@@ -342,6 +372,11 @@ function newDeadline(date, min = DEADLINE_TIME) {
 
 async function newTask(due, dueMin = null) {
   const now = Date.now();
+  // Past midnight (the day can run to 2 AM) is the next morning.
+  if (due && dueMin >= 1440) {
+    due = addDays(due, Math.floor(dueMin / 1440));
+    dueMin %= 1440;
+  }
   const task = { id: uid(), title: '', notes: '', due: due || null, dueTime: due && dueMin != null ? timeValue(dueMin) : null, labelId: null, color: null, done: false, doneAt: null, createdAt: now, updatedAt: now };
   const res = await taskEditor(task, { isNew: true, ...editorOptions() });
   if (res?.action === 'save') commit([{ op: 'put', coll: 'tasks', obj: { ...task, ...res.fields, doneAt: res.fields.done ? now : null } }]);
@@ -641,27 +676,31 @@ function clearSelection() {
   stopAutoScroll();
 }
 
-// Keeps a timeline selection going past the top or bottom edge.
+// Keeps a drag on the day/week timeline going past its top or bottom edge:
+// scrolls, then calls `then` with the pointer again.
 let scrollTimer = 0;
 let lastPoint = null;
-function autoScroll(x, y) {
+let onScroll = null;
+function autoScroll(x, y, then) {
   lastPoint = [x, y];
-  if (scrollTimer || sel?.type !== 'time' || !sel.col.closest('.tg')) return;
+  onScroll = then;
+  if (scrollTimer) return;
   const step = () => {
     scrollTimer = 0;
     const tg = $('.tg');
-    if (!sel || !tg) return;
+    if (!tg || !onScroll) return;
     const [px, py] = lastPoint;
     const top = tg.querySelector('.tg-allday').getBoundingClientRect().bottom;
     const bottom = tg.getBoundingClientRect().bottom;
     const dy = py < top + 28 ? -10 : py > bottom - 28 ? 10 : 0;
     if (!dy) return;
     tg.scrollTop += dy;
-    extendSelection(px, py);
+    onScroll(px, py);
     scrollTimer = requestAnimationFrame(step);
   };
   scrollTimer = requestAnimationFrame(step);
 }
+const followSelection = (x, y) => sel?.type === 'time' && sel.col.closest('.tg') && autoScroll(x, y, extendSelection);
 function stopAutoScroll() {
   cancelAnimationFrame(scrollTimer);
   scrollTimer = 0;
@@ -689,14 +728,14 @@ async function chooseAndCreate(x, y, s) {
   let when = '';
   if (s.type === 'time') {
     const [a, b] = drawGhost(s);
-    const at = s.moved ? Math.round(Math.min(Math.max(s.end, settings.dayStart * 60), 1439) / 15) * 15 : a;
+    const at = s.moved ? Math.round(Math.min(Math.max(s.end, settings.dayStart * 60), settings.dayEnd * 60 - 1) / 15) * 15 : a;
     heading = `${fmt(s.date, { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtTimeRange(a, b, settings.h24)}`;
     make = {
       event: () => newEvent(s.date, a, b),
-      deadline: () => newDeadline(s.date, Math.min(at, 1439)),
-      task: () => newTask(s.date, Math.min(at, 1439)),
+      deadline: () => newDeadline(s.date, at),
+      task: () => newTask(s.date, at),
     };
-    when = fmtTime(Math.min(at, 1439), settings.h24);
+    when = fmtTime(at, settings.h24);
   } else {
     markDays();
     const one = s.from === s.to;
@@ -722,10 +761,166 @@ async function chooseAndCreate(x, y, s) {
   if (choice) make[choice]();
 }
 
+// ---------------------------------------------------------------- Moving by dragging
+
+// Drag an event, deadline or task to another time or day. On the timelines
+// it moves in 15-minute steps and between days; bars, month chips and
+// date-only items move by whole days. With a mouse the move starts once the
+// pointer travels a little; on a touch screen, hold the item for a moment
+// first (a quick swipe still scrolls). A plain click or tap still opens it.
+
+const MOVABLE = '.ev, .dl, .tchip, .bar, .mchip';
+const TIME_COLS = '.tg-col, .tw-col';
+let mv = null; // the item being moved
+let suppressClickUntil = 0;
+
+const snap15 = (m) => Math.round(m / 15) * 15;
+const contains = (el, x, y) => {
+  const r = el.getBoundingClientRect();
+  return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+};
+
+// The day cell, all-day row day or day column under a point, among elements
+// like the one the move started from.
+function dropTarget(m, x, y) {
+  const list = [...app.querySelectorAll(m.targets)];
+  return list.find((c) => contains(c, x, y))
+    // In an all-day row or a column, going above or below it still counts.
+    || (m.targets !== '.mv-cell' ? list.find((c) => {
+      const r = c.getBoundingClientRect();
+      return x >= r.left && x < r.right && c.parentNode === m.home;
+    }) : null);
+}
+
+function beginMove(el, x, y) {
+  const kind = el.dataset.task ? 'task' : 'event';
+  const item = kind === 'task' ? state.tasks.get(el.dataset.task) : state.events.get(el.dataset.id);
+  if (!item) return null;
+  const date = el.dataset.date || item.due;
+  const col = el.closest(TIME_COLS);
+  const timed = col && (kind === 'task' ? !!item.dueTime : !item.allDay);
+  const m = { el, kind, item, date };
+  if (timed) {
+    m.mode = 'time';
+    const k = kind === 'event' ? diffDays(dateOf(item.start), date) : 0;
+    const start = kind === 'task' ? dt(item.due, parseTime(item.dueTime)) : shiftDays(item.start, k);
+    m.startAbs = absMin(start);
+    m.dur = kind === 'task' || item.kind === 'deadline' ? 0 : absMin(shiftDays(item.end, k)) - m.startAbs;
+    m.offset = absMin(col.dataset.date) + minuteAt(col, y) - m.startAbs;
+    m.targets = TIME_COLS;
+    m.newStart = m.startAbs;
+  } else {
+    m.mode = 'day';
+    m.targets = el.closest('.mv-week') ? '.mv-cell' : col ? TIME_COLS : '.ad-day';
+    const from = [...app.querySelectorAll(m.targets)].find((c) => contains(c, x, y)) || el.closest(TIME_COLS);
+    m.home = from?.parentNode;
+    m.fromDay = from?.dataset.date || date;
+    m.span = kind === 'event' && item.kind !== 'deadline' ? spanDays(item) : 0;
+    m.days = 0;
+  }
+  el.classList.add('moving');
+  navigator.vibrate?.(10);
+  return m;
+}
+
+function updateMove(x, y) {
+  const m = mv;
+  if (!m) return;
+  const target = dropTarget(m, x, y);
+  if (m.mode === 'time') {
+    if (!target) return;
+    const span = (settings.dayEnd - settings.dayStart) * 60;
+    const base = absMin(target.dataset.date) + settings.dayStart * 60;
+    m.newStart = snap15(base + (minuteAt(target, y) - settings.dayStart * 60) - m.offset);
+    if (!m.ghost || m.ghost.parentNode !== target) {
+      m.ghost?.remove();
+      m.ghost = document.createElement('div');
+      m.ghost.className = `ghost move${m.dur ? '' : ' line'}`;
+      target.append(m.ghost);
+    }
+    const top = Math.min(Math.max(m.newStart - base, 0), span);
+    m.ghost.style.top = `${(top / span) * 100}%`;
+    m.ghost.style.height = m.dur ? `${(Math.min(m.dur, span - top) / span) * 100}%` : '';
+    const t = m.newStart - absMin(target.dataset.date);
+    m.ghost.textContent = fmtTime(t, settings.h24);
+    if (target.closest('.tg')) autoScroll(x, y, updateMove);
+  } else {
+    if (target) m.days = diffDays(m.fromDay, target.dataset.date);
+    const first = addDays(m.date, m.days);
+    const last = addDays(first, m.span);
+    app.querySelectorAll(m.targets).forEach((c) => c.classList.toggle('drop', c.dataset.date >= first && c.dataset.date <= last));
+  }
+}
+
+function endMove(drop) {
+  const m = mv;
+  mv = null;
+  if (!m) return;
+  stopAutoScroll();
+  m.ghost?.remove();
+  m.el.classList.remove('moving');
+  app.querySelectorAll('.drop').forEach((c) => c.classList.remove('drop'));
+  suppressClickUntil = Date.now() + 400;
+  if (!drop) return;
+  const minutes = m.mode === 'time' ? m.newStart - m.startAbs : m.days * 1440;
+  if (minutes) applyMove(m, minutes);
+}
+
+async function applyMove(m, minutes) {
+  if (m.kind === 'task') {
+    const t = m.item;
+    let { due, dueTime } = t;
+    if (dueTime) {
+      const at = fromAbsMin(absMin(dt(due, parseTime(dueTime))) + minutes);
+      due = dateOf(at);
+      dueTime = at.slice(11);
+    } else due = addDays(due, Math.round(minutes / 1440));
+    return commit([{ op: 'put', coll: 'tasks', obj: { ...t, due, dueTime, updatedAt: Date.now() } }], 'Task moved');
+  }
+  const ev = m.item;
+  let scope = null;
+  if (isRepeating(state.events, ev)) {
+    scope = await askScope('save');
+    if (!scope) return;
+  }
+  return commit(moveOps(state.events, ev, m.date, minutes, scope), `${ev.kind === 'deadline' ? 'Deadline' : 'Event'} moved`);
+}
+
+function wireMoves() {
+  let down = null; // a mouse press on an item that may become a move
+  app.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
+    const el = e.target.closest(MOVABLE);
+    if (!el || e.target.closest('input')) return;
+    down = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  app.addEventListener('pointermove', (e) => {
+    if (down && !mv && (Math.abs(e.clientX - down.x) > 5 || Math.abs(e.clientY - down.y) > 5)) {
+      mv = beginMove(down.el, down.x, down.y);
+      if (mv) capture(down.el, down.id);
+    }
+    if (mv && down) updateMove(e.clientX, e.clientY);
+  });
+  const up = (drop) => () => {
+    down = null;
+    if (mv) endMove(drop);
+  };
+  app.addEventListener('pointerup', up(true));
+  app.addEventListener('pointercancel', up(false));
+  // After a move, the click that follows doesn't open the item.
+  app.addEventListener('click', (e) => {
+    if (Date.now() < suppressClickUntil) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
+}
+
 function wireGestures() {
+  wireMoves();
   // Mouse and pen: press, drag, let go.
   app.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch' || e.button !== 0 || sel) return;
+    if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
     const surface = surfaceAt(e.target);
     if (!surface) return;
     beginSelection(surface, e.clientX, e.clientY);
@@ -736,7 +931,7 @@ function wireGestures() {
   app.addEventListener('pointermove', (e) => {
     if (!mouseDown) return;
     extendSelection(e.clientX, e.clientY);
-    autoScroll(e.clientX, e.clientY);
+    followSelection(e.clientX, e.clientY);
   });
   app.addEventListener('pointerup', (e) => {
     if (!mouseDown) return;
@@ -756,10 +951,21 @@ function wireGestures() {
   };
   app.addEventListener('touchstart', (e) => {
     cancelPress();
-    if (e.touches.length !== 1 || sel) return;
+    if (e.touches.length !== 1 || sel || mv) return;
+    const t = e.touches[0];
+    const item = e.target.closest(MOVABLE);
+    if (item && !e.target.closest('input')) {
+      // Hold an item to pick it up; a tap still opens it.
+      const p = { item, x: t.clientX, y: t.clientY, active: false };
+      p.timer = setTimeout(() => {
+        mv = beginMove(item, p.x, p.y);
+        p.active = !!mv;
+      }, LONG_PRESS_MS);
+      press = p;
+      return;
+    }
     const surface = surfaceAt(e.target);
     if (!surface) return;
-    const t = e.touches[0];
     const p = { surface, x: t.clientX, y: t.clientY, lx: t.clientX, ly: t.clientY, t: Date.now(), active: false };
     p.timer = setTimeout(() => {
       p.active = true;
@@ -780,16 +986,24 @@ function wireGestures() {
       if (Math.abs(t.clientX - press.x) > 8 || Math.abs(t.clientY - press.y) > 8) cancelPress(); // it's a scroll
       return;
     }
-    e.preventDefault(); // keep the page still while selecting
+    e.preventDefault(); // keep the page still while selecting or moving
     press.lx = t.clientX;
     press.ly = t.clientY;
+    if (press.item) return updateMove(t.clientX, t.clientY);
     extendSelection(t.clientX, t.clientY);
-    autoScroll(t.clientX, t.clientY);
+    followSelection(t.clientX, t.clientY);
   }, { passive: false });
   app.addEventListener('touchend', (e) => {
     const p = press;
     cancelPress();
     if (!p) return;
+    if (p.item) {
+      if (p.active) {
+        e.preventDefault(); // no click afterwards
+        endMove(true);
+      }
+      return;
+    }
     if (p.active) {
       e.preventDefault(); // no click afterwards
       finishSelection(p.lx, p.ly);
@@ -800,13 +1014,14 @@ function wireGestures() {
     }
   }, { passive: false });
   app.addEventListener('touchcancel', () => {
-    const active = press?.active;
+    const p = press;
     cancelPress();
-    if (active) clearSelection();
+    if (p?.item && p.active) endMove(false);
+    else if (p?.active) clearSelection();
   });
   // A long press would otherwise bring up the browser's menu.
   app.addEventListener('contextmenu', (e) => {
-    if (press?.active || sel || surfaceAt(e.target)) e.preventDefault();
+    if (press || sel || mv || surfaceAt(e.target)) e.preventDefault();
   });
 }
 
@@ -889,12 +1104,16 @@ function wireEvents() {
     if (key === lastCal) return;
     lastCal = key;
     clearTimeout(calTimer);
-    calTimer = setTimeout(() => store && !sel && isGrid() && renderCalendar(viewRange(), false), 60);
+    calTimer = setTimeout(() => {
+      if (!store || sel || mv) return;
+      if (isGrid()) renderCalendar(viewRange(), false);
+      else fitText($('#cal'));
+    }, 60);
   });
 
   // Keep "now" and "today" current.
   const tick = () => {
-    if (!store || document.hidden || sel || press) return;
+    if (!store || document.hidden || sel || press || mv) return;
     if (today() !== lastToday) {
       if (state.date === lastToday) state.date = today();
       lastToday = today();
@@ -970,6 +1189,7 @@ function openSettings() {
     onChange: (changes) => {
       settings = { ...settings, ...changes };
       if (settings.dayEnd <= settings.dayStart) settings.dayEnd = Math.min(24, settings.dayStart + 1);
+      if (settings.workEnd <= settings.workStart) settings.workEnd = Math.min(24, settings.workStart + 1);
       persist();
       render();
     },

@@ -15,6 +15,7 @@ const SHELL = [
   'js/dates.js',
   'js/demo.js',
   'js/dialogs.js',
+  'js/holidays.js',
   'js/icons.js',
   'js/labels.js',
   'js/main.js',

@@ -39,6 +39,22 @@ const fieldRow = (label, control, cls = '') =>
 const swatches = (colors, name = 'color') =>
   `<div class="swatches">${colors.map((c) => `<label class="swatch c-${c}" title="${c === 'none' ? 'No color' : c}"><input type="radio" name="${name}" value="${c}"><span></span></label>`).join('')}</div>`;
 
+// A small × beside a time field empties it (no time), which the iPhone's time
+// picker can't do by itself. The form gets .no-time while the field is empty.
+const clearTime = (name, label) =>
+  `<button type="button" class="icon-btn sm clear-time" data-clear="${name}" aria-label="${label}" title="${label}">${icons.close}</button>`;
+function wireClearTime(f, name) {
+  const input = f.elements[name];
+  const sync = () => f.classList.toggle('no-time', !input.value);
+  input.addEventListener('input', sync);
+  input.addEventListener('change', sync);
+  f.querySelector(`[data-clear="${name}"]`).addEventListener('click', () => {
+    input.value = '';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  sync();
+}
+
 // Checks the radio button `name` with `value`, if there is one.
 function check(root, name, value) {
   const input = root.querySelector(`input[name="${name}"][value="${CSS.escape(value)}"]`);
@@ -147,7 +163,7 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
       </div>
       <label class="field-row toggle-row ev-only"><span class="lbl">All day</span><input type="checkbox" name="allDay" class="switch"></label>
       <label class="field-row toggle-row ev-only"><span class="lbl">Tentative <span class="hint">(shown lightly, dashed outline)</span></span><input type="checkbox" name="tentative" class="switch"></label>
-      ${fieldRow('<span class="ev-only">Starts</span><span class="dl-only">Due</span>', '<input type="date" name="startDate" required><input type="time" name="startTime" class="time">', 'dt-row')}
+      ${fieldRow('<span class="ev-only">Starts</span><span class="dl-only">Due</span>', `<input type="date" name="startDate" required><input type="time" name="startTime" class="time"><span class="dl-only">${clearTime('startTime', 'No due time')}</span><span class="hint dl-only no-time-hint">Any time that day</span>`, 'dt-row')}
       ${fieldRow('Ends', '<input type="date" name="endDate" required><input type="time" name="endTime" class="time">', 'dt-row ev-only')}
       ${fieldRow('Repeat', '<select name="repeat"></select>')}
       <div class="repeat-more">
@@ -194,7 +210,8 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
     const deadline0 = initial.kind === 'deadline';
     const end0 = deadline0 ? fromAbsMin(absMin(initial.start) + 60) : initial.end;
     el('endDate').value = dateOf(end0);
-    el('startTime').value = timeValue(initial.allDay ? 9 * 60 : minOf(initial.start));
+    // A deadline without a time is due any time that day.
+    el('startTime').value = deadline0 && initial.allDay ? '' : timeValue(initial.allDay ? 9 * 60 : minOf(initial.start));
     el('endTime').value = timeValue(initial.allDay ? 10 * 60 : minOf(end0));
     check(f, 'kind', deadline0 ? 'deadline' : 'event');
     check(f, 'shape', ['arrow', 'line'].includes(initial.shape) ? initial.shape : 'block');
@@ -286,8 +303,15 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
       },
     });
     f.addEventListener('change', (e) => {
+      // An event needs times: one made from a deadline with no time gets 9–10 AM.
+      if (e.target.name === 'kind' && !isDeadline() && !el('startTime').value) {
+        el('startTime').value = '09:00';
+        el('endDate').value = el('startDate').value;
+        el('endTime').value = '10:00';
+      }
       if (['kind', 'color', 'allDay', 'startDate', 'startTime', 'endDate', 'endTime'].includes(e.target.name)) updateKindUI();
     });
+    wireClearTime(f, 'startTime');
 
     const fail = (msg) => {
       const p = f.querySelector('.form-error');
@@ -366,14 +390,15 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
     // ---- save / delete
     const collect = () => {
       const kind = isDeadline() ? 'deadline' : 'event';
-      const allDay = kind === 'event' && el('allDay').checked;
+      // A deadline with no time is stored as an all-day deadline.
+      const allDay = kind === 'event' ? el('allDay').checked : !el('startTime').value;
       const sd = el('startDate').value;
       const ed = el('endDate').value;
       if (!sd || (kind === 'event' && !ed)) return fail(kind === 'deadline' ? 'Pick a date.' : 'Pick a start and end date.');
       let start;
       let end;
       if (kind === 'deadline') {
-        start = dt(sd, parseTime(el('startTime').value));
+        start = allDay ? sd : dt(sd, parseTime(el('startTime').value));
         end = start;
       } else if (allDay) {
         if (ed < sd) return fail('The end date is before the start date.');
@@ -465,7 +490,7 @@ export function taskEditor(task, { isNew = false, labels, manageLabels }) {
     </div>
     <div class="dlg-body">
       ${isNew ? '' : '<label class="field-row toggle-row"><span class="lbl">Done</span><input type="checkbox" name="done" class="switch"></label>'}
-      ${fieldRow('Due', '<input type="date" name="due"><input type="time" name="dueTime" class="time">', 'dt-row')}
+      ${fieldRow('Due', `<input type="date" name="due"><input type="time" name="dueTime" class="time">${clearTime('dueTime', 'No time')}`, 'dt-row')}
       <p class="hint">With a date it shows on the calendar: at its time, or at the end of the day without one. Leave the date empty to keep it under “No date”.</p>
       ${fieldRow('Label', '<div class="label-pills"></div>', 'label-row')}
       ${fieldRow('Color', swatches(['none', ...COLORS]))}
@@ -485,6 +510,7 @@ export function taskEditor(task, { isNew = false, labels, manageLabels }) {
     if (f.elements.done) f.elements.done.checked = !!task.done;
     f.elements.due.value = task.due || '';
     f.elements.dueTime.value = task.dueTime || '';
+    wireClearTime(f, 'dueTime');
     f.elements.notes.value = task.notes || '';
     const label0 = task.labelId ? labels().get(task.labelId) : null;
     if (!check(f, 'color', task.color || label0?.color || 'none')) check(f, 'color', 'none');
@@ -733,7 +759,7 @@ export function createMenu({ x, y, heading, choices }) {
 export function settingsDialog({ settings, sync, lastBackup, labels, onChange, actions }) {
   const hour = (h) => (settings.h24 ? `${String(h).padStart(2, '0')}:00` : `${h % 12 || 12} ${h < 12 || h === 24 ? 'AM' : 'PM'}`);
   const hours = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
-    .map((h) => `<option value="${h}">${h === 24 ? `${hour(24)} (midnight)` : hour(h)}</option>`).join('');
+    .map((h) => `<option value="${h}">${h === 24 ? `${hour(24)} (midnight)` : h > 24 ? `${hour(h - 24)} (next day)` : hour(h)}</option>`).join('');
   const syncHtml = sync.kind === 'cloud'
     ? `<p class="sync-line">${icons.cloud}<span>Signed in as <b>${esc(sync.email || '')}</b>. Changes sync to your other devices.</span></p>
        <button type="button" class="btn" data-act="signOut">Sign out</button>`
@@ -747,9 +773,11 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
       <section>
         <h3>Calendar</h3>
         ${fieldRow('Day starts at', `<select name="dayStart">${hours(0, 12)}</select>`)}
-        ${fieldRow('Day ends at', `<select name="dayEnd">${hours(13, 24)}</select>`)}
+        ${fieldRow('Day ends at', `<select name="dayEnd">${hours(13, 28)}</select>`)}
         ${fieldRow('Week starts on', '<select name="weekStart"><option value="0">Sunday</option><option value="1">Monday</option></select>')}
         ${fieldRow('Time format', '<select name="h24"><option value="0">12-hour (1:30 PM)</option><option value="1">24-hour (13:30)</option></select>')}
+        ${fieldRow('Working hours', `<select name="workStart" aria-label="Working hours start">${hours(0, 23)}</select><span class="hint">to</span><select name="workEnd" aria-label="Working hours end">${hours(1, 24)}</select>`, 'work-row')}
+        <label class="field-row toggle-row"><span class="lbl">Shade working hours <span class="hint">(weekdays that aren’t holidays)</span></span><input type="checkbox" name="showWork" class="switch"></label>
         ${fieldRow('Hour height', `<select name="hourHeight">${HOUR_HEIGHTS.map((h, i) => `<option value="${h}">${h} px${i === 0 ? ' (compact, default)' : i === HOUR_HEIGHTS.length - 1 ? ' (large)' : ''}</option>`).join('')}</select>`)}
       </section>
       <section>
@@ -780,6 +808,9 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
     const f = dlg.querySelector('form');
     f.elements.dayStart.value = settings.dayStart;
     f.elements.dayEnd.value = settings.dayEnd;
+    f.elements.workStart.value = settings.workStart;
+    f.elements.workEnd.value = settings.workEnd;
+    f.elements.showWork.checked = !!settings.showWork;
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
     f.elements.hourHeight.value = HOUR_HEIGHTS.includes(settings.hourHeight) ? settings.hourHeight : HOUR_HEIGHTS[0];
@@ -798,6 +829,9 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
         weekStart: +f.elements.weekStart.value,
         h24: f.elements.h24.value === '1',
         hourHeight: +f.elements.hourHeight.value,
+        workStart: +f.elements.workStart.value,
+        workEnd: +f.elements.workEnd.value,
+        showWork: f.elements.showWork.checked,
       });
     });
     f.addEventListener('submit', (e) => e.preventDefault());

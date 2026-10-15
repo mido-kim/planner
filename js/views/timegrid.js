@@ -2,6 +2,7 @@ import { absMin, addDays, fmt, fmtTime, fmtTimeRange, minOf, nowMin, pad, parseT
 import { icons } from '../icons.js';
 import { colorOf } from '../labels.js';
 import { spanDays } from '../recurrence.js';
+import { holidayName } from '../holidays.js';
 import { esc } from '../util.js';
 import { barHtml, layoutBars } from './bars.js';
 
@@ -40,25 +41,68 @@ export const isBarEvent = (occ) => occ.ev.kind !== 'deadline' && (occ.ev.allDay 
 
 const isWeekend = (d) => weekday(d) === 0 || weekday(d) === 6;
 
+// The day can run past midnight (a day end of 26:00 is 2 AM the next
+// morning), so a moment before then belongs to the day before.
+export function slotOf(date, min, H1) {
+  const off = Math.max(0, H1 - 1440);
+  return min < off ? { day: addDays(date, -1), min: min + 1440 } : { day: date, min };
+}
+
+// Working hours on weekdays that aren't public holidays, very lightly shaded.
+function workBand(d, settings, H0, H1, scale, unit) {
+  if (!settings.showWork || isWeekend(d) || holidayName(d)) return '';
+  const a = Math.max(settings.workStart * 60, H0);
+  const b = Math.min(settings.workEnd * 60, H1);
+  return b > a ? `<div class="work" style="top:${(a - H0) * scale}${unit};height:${(b - a) * scale}${unit}"></div>` : '';
+}
+
+// A day header: weekday and date; public holidays get their name as a tooltip.
+function dayHead(d, cls, t, dom) {
+  const hol = holidayName(d);
+  const c = [cls, d === t && 'today', d < t && 'past', hol && 'holiday'].filter(Boolean).join(' ');
+  return `<button class="${c}" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}${hol ? `, ${esc(hol)}` : ''}"${hol ? ` title="${esc(hol)}"` : ''}><span class="dow">${fmt(d, { weekday: 'short' })}</span><span class="dom">${dom}</span></button>`;
+}
+
+const hourText = (h, h24, short) => {
+  const hh = h % 24;
+  if (h24) return short ? pad(hh) : `${pad(hh)}:00`;
+  return short ? `${hh % 12 || 12}${hh < 12 ? 'a' : 'p'}` : `${hh % 12 || 12} ${hh < 12 ? 'AM' : 'PM'}`;
+};
+
 // Sorts out what goes where for `days`: per day, the event pieces on the
 // timeline (segs), deadlines and timed tasks (marks, with `top` in `scale`
-// units), date-only tasks (bottom) and chips for things outside the hours
-// shown (oor); plus the bars for the all-day row.
+// units), date-only tasks and deadlines (bottom, endLines) and chips for
+// things outside the hours shown (oor); plus the bars for the all-day row.
+// Each day runs from its first shown hour to H1, which may be past midnight;
+// the small hours before that belong to the day before.
 function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
-  const cols = new Map(days.map((d) => [d, { oor: [], segs: [], marks: [], bottom: [] }]));
+  const cols = new Map(days.map((d) => [d, { oor: [], segs: [], marks: [], bottom: [], endLines: [] }]));
   const bars = [];
+  const off = Math.max(0, H1 - 1440);
   const oor = (col, where, min, html) => col.oor.push({ order: where === 'early' ? 0 : 1, min, html });
   const arrow = (where) => (where === 'early' ? icons.up : icons.down);
+  // Where a moment goes: its day's column, or, when that day isn't shown (the
+  // small hours of the first day), an early chip on the day itself.
+  const spot = (date, min) => {
+    const sl = slotOf(date, min, H1);
+    const col = cols.get(sl.day);
+    if (col) return { col, p: placeAt(sl.min, H0, H1, scale) };
+    const own = cols.get(date);
+    return own ? { col: own, p: { where: 'early' } } : null;
+  };
 
   for (const occ of occs) {
     const ev = occ.ev;
     if (ev.kind === 'deadline') {
-      const col = cols.get(occ.date);
-      if (!col) continue;
+      if (ev.allDay) {
+        cols.get(occ.date)?.endLines.push(occ);
+        continue;
+      }
       const min = minOf(occ.start);
-      const p = placeAt(min, H0, H1, scale);
-      if (p.where === 'grid') col.marks.push({ occ, top: p.top });
-      else oor(col, p.where, min, (style) => chip(occ, color(ev), 'oor dl-chip', `${arrow(p.where)}<b>${fmtTime(min, h24)}</b>${icons.flag}${esc(ev.title || '(No title)')}`, style));
+      const at = spot(occ.date, min);
+      if (!at) continue;
+      if (at.p.where === 'grid') at.col.marks.push({ occ, top: at.p.top });
+      else oor(at.col, at.p.where, min, (style) => chip(occ, color(ev), 'oor dl-chip', `${arrow(at.p.where)}<b>${fmtTime(min, h24)}</b>${icons.flag}<span class="ct">${esc(ev.title || '(No title)')}</span>`, style));
       continue;
     }
     if (isBarEvent(occ)) {
@@ -68,13 +112,15 @@ function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
     // Cut the event into one piece per day it touches.
     const s = absMin(occ.start);
     const e = Math.max(absMin(occ.end), s + 15);
-    for (const d of days) {
+    days.forEach((d, i) => {
       const ds = absMin(d);
-      const a = Math.max(s, ds) - ds;
-      const b = Math.min(e, ds + 1440) - ds;
-      if (b <= a) continue;
+      const lo = ds + (i === 0 ? 0 : off);
+      const hi = ds + 1440 + off;
+      const a = Math.max(s, lo) - ds;
+      const b = Math.min(e, hi) - ds;
+      if (b <= a) return;
       const col = cols.get(d);
-      const label = (where) => (style) => chip(occ, color(ev), 'oor', `${arrow(where)}<b>${fmtTime(a, h24)}</b> ${esc(ev.title || '(No title)')}`, style);
+      const label = (where) => (style) => chip(occ, color(ev), 'oor', `${arrow(where)}<b>${fmtTime(a, h24)}</b> <span class="ct">${esc(ev.title || '(No title)')}</span>`, style);
       if (b <= H0) oor(col, 'early', a, label('early'));
       else if (a >= H1) oor(col, 'late', a, label('late'));
       else {
@@ -82,23 +128,23 @@ function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
           occ,
           va: Math.max(a, H0),
           vb: Math.min(b, H1),
-          contTop: s < ds || a < H0,
-          contBottom: e > ds + 1440 || b > H1,
+          contTop: s < lo || a < H0,
+          contBottom: e > hi || b > H1,
         });
       }
-    }
+    });
   }
 
   for (const task of tasks) {
-    const col = cols.get(task.due);
-    if (!col) continue;
-    const p = taskPlace(task, H0, H1, scale);
-    if (p.where === 'grid') col.marks.push({ task, top: p.top });
-    else if (p.where === 'bottom') col.bottom.push(task);
-    else {
-      const min = parseTime(task.dueTime);
-      oor(col, p.where, min, (style) => taskChip(task, color(task, 'none'), 'chip oor tk-chip', `${arrow(p.where)}<b>${fmtTime(min, h24)}</b>`, style));
+    if (!task.dueTime) {
+      cols.get(task.due)?.bottom.push(task);
+      continue;
     }
+    const min = parseTime(task.dueTime);
+    const at = spot(task.due, min);
+    if (!at) continue;
+    if (at.p.where === 'grid') at.col.marks.push({ task, top: at.p.top });
+    else oor(at.col, at.p.where, min, (style) => taskChip(task, color(task, 'none'), 'chip oor tk-chip', `${arrow(at.p.where)}<b>${fmtTime(min, h24)}</b>`, style));
   }
   return { cols, bars };
 }
@@ -137,17 +183,15 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
   const t = today();
   const color = (item, fallback) => colorOf(item, labels, fallback);
   const { cols, bars } = collect(days, occs, tasks, { H0, H1, scale: ppm, h24, color });
+  const now = slotOf(t, nowMin(), H1);
 
-  const heads = days.map((d) => {
-    const cls = ['tg-dayhead', d === t && 'today', d < t && 'past'].filter(Boolean).join(' ');
-    return `<button class="${cls}" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}"><span class="dow">${fmt(d, { weekday: 'short' })}</span><span class="dom">${parts(d).d}</span></button>`;
-  });
+  const heads = days.map((d) => dayHead(d, 'tg-dayhead', t, parts(d).d));
   const strip = allDayStrip(days, cols, bars, { rowH: AD_ROW, h24, color, cls: 'tg-allday' });
 
   const bodies = days.map((d) => {
-    const { segs, marks, bottom } = cols.get(d);
+    const { segs, marks, bottom, endLines } = cols.get(d);
     layout(segs, MIN_PX / ppm);
-    const html = segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev)));
+    const html = [workBand(d, settings, H0, H1, ppm, 'px'), ...segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev)))];
     // Deadlines and timed tasks, top to bottom. A deadline's tag sits above its
     // line, or below it when there's no room; task chips that would overlap
     // move down.
@@ -167,6 +211,12 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
         html.push(taskChip(m.task, color(m.task, 'none'), 'tchip', '', `top:${top}px`));
       }
     }
+    // Date-only deadlines are lines at the very end of the day.
+    endLines.forEach((occ, k) => {
+      const top = colH - 1 - k * (TAG_PX + 2);
+      tags.push([top - TAG_PX, top + 1]);
+      html.push(deadlineLine(occ, `${top}px`, h24, color(occ.ev), false));
+    });
     // Date-only tasks stack up from the bottom, above any deadline tag there.
     let y = colH - TASK_PX - 2;
     for (const task of bottom.sort(byDoneThenCreated)) {
@@ -174,18 +224,14 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
       html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:${y}px`));
       y -= TASK_PX + 2;
     }
-    if (d === t) {
-      const nm = nowMin();
-      if (nm >= H0 && nm < H1) html.push(`<div class="now" style="top:${(nm - H0) * ppm}px"></div>`);
-    }
+    if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * ppm}px"></div>`);
     const cls = ['tg-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
     return `<div class="${cls}" data-date="${d}">${html.join('')}</div>`;
   });
 
   const labelsHtml = [];
   for (let h = settings.dayStart; h < settings.dayEnd; h++) {
-    const label = h24 ? `${pad(h)}:00` : `${h % 12 || 12} ${h < 12 || h === 24 ? 'AM' : 'PM'}`;
-    labelsHtml.push(`<span style="top:${(h * 60 - H0) * ppm}px">${label}</span>`);
+    labelsHtml.push(`<span${h >= 24 ? ' class="next"' : ''} style="top:${(h * 60 - H0) * ppm}px">${hourText(h, h24)}</span>`);
   }
 
   return `<div class="tg n${n}" style="--hh:${settings.hourHeight}px">
@@ -206,27 +252,24 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
   const h24 = settings.h24;
   const t = today();
   const color = (item, fallback) => colorOf(item, labels, fallback);
+  const now = slotOf(t, nowMin(), H1);
 
   // Hour labels every three hours.
   const axis = [];
   for (let h = Math.ceil(settings.dayStart / 3) * 3; h < settings.dayEnd; h += 3) {
-    if (h * 60 - H0 < 60) continue;
-    const label = h24 ? `${pad(h)}` : `${h % 12 || 12}${h < 12 ? 'a' : 'p'}`;
-    axis.push(`<span style="top:${(h * 60 - H0) * pct}%">${label}</span>`);
+    if (h * 60 - H0 < 60 || H1 - h * 60 < 60) continue;
+    axis.push(`<span style="top:${(h * 60 - H0) * pct}%">${hourText(h, h24, true)}</span>`);
   }
 
   const weeks = [days.slice(0, 7), days.slice(7, 14)].map((week, w) => {
     const { cols, bars } = collect(week, occs, tasks, { H0, H1, scale: pct, h24, color });
-    const heads = week.map((d) => {
-      const cls = ['tw-dayhead', d === t && 'today', d < t && 'past'].filter(Boolean).join(' ');
-      const dom = parts(d).d === 1 || (w === 0 && d === week[0]) ? fmt(d, { month: 'short', day: 'numeric' }) : parts(d).d;
-      return `<button class="${cls}" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}"><span class="dow">${fmt(d, { weekday: 'short' })}</span><span class="dom">${dom}</span></button>`;
-    });
+    const heads = week.map((d) =>
+      dayHead(d, 'tw-dayhead', t, parts(d).d === 1 || (w === 0 && d === week[0]) ? fmt(d, { month: 'short', day: 'numeric' }) : parts(d).d));
     const strip = allDayStrip(week, cols, bars, { rowH: MINI_AD_ROW, h24, color, cls: 'tw-allday' });
     const bodies = week.map((d) => {
-      const { segs, marks, bottom } = cols.get(d);
+      const { segs, marks, bottom, endLines } = cols.get(d);
       layout(segs, 20);
-      const html = segs.map((seg) => miniBlock(seg, H0, pct, h24, color(seg.occ.ev)));
+      const html = [workBand(d, settings, H0, H1, pct, '%'), ...segs.map((seg) => miniBlock(seg, H0, pct, h24, color(seg.occ.ev)))];
       marks.sort((x, y) => x.top - y.top);
       let lastTask = -Infinity;
       let stack = 0;
@@ -239,12 +282,11 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
           html.push(taskChip(m.task, color(m.task, 'none'), 'tchip', '', `top:calc(${m.top}% + ${stack * MINI_TASK_PX}px)`));
         }
       }
+      endLines.forEach((occ, k) => html.push(deadlineLine(occ, `calc(100% - ${1 + k * 14}px)`, h24, color(occ.ev), false)));
+      const lift = endLines.length * 14;
       bottom.sort(byDoneThenCreated).forEach((task, k) =>
-        html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:calc(100% - ${(k + 1) * MINI_TASK_PX}px)`)));
-      if (d === t) {
-        const nm = nowMin();
-        if (nm >= H0 && nm < H1) html.push(`<div class="now" style="top:${(nm - H0) * pct}%"></div>`);
-      }
+        html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:calc(100% - ${lift + (k + 1) * MINI_TASK_PX}px)`)));
+      if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * pct}%"></div>`);
       const cls = ['tw-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
       return `<div class="${cls}" data-date="${d}">${html.join('')}</div>`;
     });
@@ -270,7 +312,8 @@ function taskChip(task, color, cls, before, style) {
 function deadlineLine(occ, top, h24, color, below) {
   const ev = occ.ev;
   const title = esc(ev.title || '(No title)');
-  return `<div class="dl c-${color}${below ? ' below' : ''}" style="top:${top}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, due ${fmtTime(minOf(occ.start), h24)}"><span class="dl-tag">${icons.flag}<span>${title}</span></span></div>`;
+  const due = ev.allDay ? 'due that day' : `due ${fmtTime(minOf(occ.start), h24)}`;
+  return `<div class="dl c-${color}${below ? ' below' : ''}${ev.allDay ? ' day-end' : ''}" style="top:${top}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${due}"><span class="dl-tag">${icons.flag}<span class="ct">${title}</span></span></div>`;
 }
 
 // Splits overlapping events into side-by-side columns. Each event gets a

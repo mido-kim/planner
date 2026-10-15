@@ -38,7 +38,9 @@ export function agendaGroups({ from, to, occs, tasks, showDone, t = today() }) {
   const days = new Map();
   for (let d = from; d < to; d = addDays(d, 1)) days.set(d, []);
   for (const occ of occs) {
-    if (occ.ev.allDay) {
+    if (occ.ev.kind === 'deadline' && occ.ev.allDay) {
+      days.get(occ.date)?.push({ type: 'deadline', occ, sort: 1440 }); // due that day: at its end
+    } else if (occ.ev.allDay) {
       const last = addDays(occ.date, spanDays(occ.ev));
       for (let d = occ.date < from ? from : occ.date; d <= last && d < to; d = addDays(d, 1)) days.get(d)?.push({ type: 'event', occ, sort: -2 }); // all-day first
     } else {
@@ -112,7 +114,7 @@ export function renderAgenda({ from, to, occs, tasks, events, labels = new Map()
       <span class="ag-flag">${icons.flagBtn}</span>
       <div class="ag-main">
         <div class="ag-title">${esc(ev.title || '(No title)')}</div>
-        <div class="ag-when">Due ${fmtTime(minOf(occ.start), h24)}</div>
+        <div class="ag-when">${ev.allDay ? 'Due any time that day' : `Due ${fmtTime(minOf(occ.start), h24)}`}</div>
         ${meta([labelTag(ev), repeat(ev)])}${notes(ev)}
       </div>
     </div>`;

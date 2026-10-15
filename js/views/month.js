@@ -1,5 +1,6 @@
 import { addDays, daysFrom, fmt, minOf, parseTime, parts, today, weekday } from '../dates.js';
 import { icons } from '../icons.js';
+import { holidayName } from '../holidays.js';
 import { colorOf } from '../labels.js';
 import { spanDays, WEEKDAYS_SHORT } from '../recurrence.js';
 import { esc } from '../util.js';
@@ -26,7 +27,9 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
       bars.push({ occ, first: occ.date, last: addDays(occ.date, span), title: ev.title || '' });
     } else {
       const html = ev.kind === 'deadline' ? deadlineChip(occ, h24, color(ev)) : eventChip(occ, h24, color(ev));
-      byDay.get(occ.date)?.push({ min: minOf(occ.start), kind: ev.kind === 'deadline' ? 1 : 0, title: ev.title || '', html });
+      // Date-only deadlines go at the end of the day, like date-only tasks.
+      const min = ev.kind === 'deadline' && ev.allDay ? 1440 : minOf(occ.start);
+      byDay.get(occ.date)?.push({ min, kind: ev.kind === 'deadline' ? 1 : 0, title: ev.title || '', html });
     }
   }
   for (const task of tasks) {
@@ -59,10 +62,12 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
         (d < range.from || d >= range.to) && 'out',
         d === t && 'today',
         (weekday(d) === 0 || weekday(d) === 6) && 'wkend',
+        holidayName(d) && 'holiday',
       ].filter(Boolean).join(' ');
+      const hol = holidayName(d);
       const label = dayNum === 1 ? fmt(d, { month: 'short', day: 'numeric' }) : dayNum;
       return `<div class="${cls}" data-date="${d}">
-        <div class="mv-num"><span role="button" tabindex="0" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}">${label}</span></div>
+        <div class="mv-num"><span role="button" tabindex="0" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}${hol ? `, ${esc(hol)}` : ''}"${hol ? ` title="${esc(hol)}"` : ''}>${label}</span></div>
         ${top ? `<div class="mv-lanes" style="height:calc(${top} * var(--mrow) - 1px)"></div>` : ''}
         ${items.slice(0, shown).map((x) => x.html).join('')}
         ${more ? `<div class="mv-more" role="button" tabindex="0" data-goto="${d}">+${more} more</div>` : ''}
@@ -98,7 +103,8 @@ function eventChip(occ, h24, color) {
 
 function deadlineChip(occ, h24, color) {
   const title = esc(occ.ev.title || '(No title)');
-  return `<div class="mchip dline c-${color}" ${attrs(occ)} title="Deadline: ${title}">${icons.flag}<span class="mt">${shortTime(minOf(occ.start), h24)}</span><span class="mtt">${title}</span></div>`;
+  const time = occ.ev.allDay ? '' : `<span class="mt">${shortTime(minOf(occ.start), h24)}</span>`;
+  return `<div class="mchip dline c-${color}" ${attrs(occ)} title="Deadline: ${title}">${icons.flag}${time}<span class="mtt">${title}</span></div>`;
 }
 
 function taskChip(task, h24, color) {

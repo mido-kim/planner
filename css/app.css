@@ -27,6 +27,8 @@
   --head-h: 52px;
   --col-min: 0px;
   --fill: 100%; /* how much of an item's pastel shows in its fill */
+  --work: rgba(70, 60, 66, 0.04); /* working hours, very lightly shaded */
+  --today-tint: 16%; /* today's column: this much of the accent */
 
   --c-blue: #bcd8ec;
   --c-teal: #bfe6dd;
@@ -73,6 +75,8 @@
     --now: #ff7aa8;
     --shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
     --fill: 30%;
+    --work: rgba(255, 245, 250, 0.03);
+    --today-tint: 7%;
     /* On dark, the pastel itself is the readable "ink". */
     --ink-blue: var(--c-blue);
     --ink-teal: var(--c-teal);
@@ -243,7 +247,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* The date input covers the title, so tapping the title opens a date picker. */
 .jump {
@@ -432,9 +435,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
 }
+.chip .ct { min-width: 0; overflow: hidden; }
 .chip.oor {
   background: transparent;
   color: var(--fg-2);
@@ -479,7 +482,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   isolation: isolate;
 }
 .tg-col.wkend, .tg-allday.wkend { background-color: var(--bg-2); }
-.tg-col.today { background-color: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.tg-col.today { background-color: color-mix(in srgb, var(--accent) var(--today-tint), var(--bg)); }
 
 .now {
   position: absolute;
@@ -520,13 +523,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .ev:hover { filter: brightness(0.97) saturate(1.1); z-index: 10 !important; }
 .ev .ev-t {
+  flex: 0 1 auto;
+  min-height: 0;
   font-weight: 600;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
 }
 .ev .ev-m {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -545,7 +548,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 /* In a short block the title comes first and keeps the room: the time gives
    way first, and is hidden when there's no space left for it. */
-.ev.short .ev-t { display: block; white-space: nowrap; text-overflow: ellipsis; flex: 0 0 auto; max-width: 100%; min-width: 0; }
+.ev.short .ev-t { white-space: nowrap; flex: 0 0 auto; max-width: 100%; min-width: 0; }
 .ev.short .ev-m { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: clip; }
 .ev.ct { border-top-left-radius: 0; border-top-right-radius: 0; }
 .ev.cb { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
@@ -561,6 +564,47 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mchip.tent:not(.fill) .mtt { color: var(--fg-2); }
 
 .ad-day.sel, .mv-cell.sel { background: color-mix(in srgb, var(--accent) 55%, var(--bg)); }
+
+/* Text cut where its box ends fades out toward the end instead of "…". */
+.fade {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.8em), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.8em), transparent);
+}
+.fade-last {
+  -webkit-mask-image: linear-gradient(#000, #000), linear-gradient(to right, #000 calc(100% - 2.2em), transparent);
+  -webkit-mask-size: 100% calc(100% - var(--lh, 15px)), 100% var(--lh, 15px);
+  -webkit-mask-position: top, bottom;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: linear-gradient(#000, #000), linear-gradient(to right, #000 calc(100% - 2.2em), transparent);
+  mask-size: 100% calc(100% - var(--lh, 15px)), 100% var(--lh, 15px);
+  mask-position: top, bottom;
+  mask-repeat: no-repeat;
+}
+
+/* Working hours on weekdays that aren't holidays. */
+.work { position: absolute; left: 0; right: 0; background: var(--work); pointer-events: none; }
+
+/* Public holidays: the date in red, the name on hover. */
+.tg-dayhead.holiday .dom, .tw-dayhead.holiday .dom, .mv-cell.holiday .mv-num span { color: var(--danger); }
+.tg-dayhead.holiday.today .dom, .tw-dayhead.holiday.today .dom, .mv-cell.holiday.today .mv-num span { color: var(--accent-fg); }
+
+/* The hours after midnight (when the day runs past it). */
+.tg-axis span.next { color: color-mix(in srgb, var(--fg-3) 70%, var(--accent-ink)); }
+
+/* Moving an item: it dims, and where it would land is shown. */
+.moving { opacity: 0.4; }
+.ad-day.drop, .mv-cell.drop, .tg-col.drop, .tw-col.drop { background-color: color-mix(in srgb, var(--accent) 45%, var(--bg)); }
+.ghost.move {
+  z-index: 40;
+  display: flex;
+  justify-content: flex-end;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-fg);
+  white-space: nowrap;
+}
+.ghost.move.line { height: 0; border: 0; border-top: 2px solid var(--accent-strong); border-radius: 0; background: none; padding-top: 0; }
 .ghost {
   position: absolute;
   left: 2px;
@@ -640,9 +684,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   isolation: isolate;
 }
 .tw-col.wkend { background-color: var(--bg-2); }
-.tw-col.today { background-color: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.tw-col.today { background-color: color-mix(in srgb, var(--accent) var(--today-tint), var(--bg)); }
 .ev.mini { gap: 0; min-height: 3px; padding: 1px 3px; border-radius: 3px; font-size: 10px; line-height: 1.15; }
-.ev.mini .ev-t { -webkit-line-clamp: 3; }
+
 .tw .dl-tag { height: 12px; padding: 0 3px; font-size: 9px; line-height: 12px; }
 .tw .dl-tag svg { display: none; }
 .tw .tchip { height: 15px; gap: 2px; padding: 0 3px 0 2px; border-radius: 4px; font-size: 9.5px; }
@@ -677,7 +721,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   cursor: pointer;
   color: var(--ci);
 }
-.bar-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bar-t { min-width: 0; overflow: hidden; }
 .bar-t b, .bar .bt { font-weight: 600; opacity: 0.9; }
 .bar-l, .bar-r { display: none; }
 .bar.shape-block { background: var(--cf); color: var(--ci); }
@@ -748,7 +792,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   line-height: 16px;
   white-space: nowrap;
 }
-.dl-tag span { overflow: hidden; text-overflow: ellipsis; }
+.dl-tag span { min-width: 0; overflow: hidden; }
 .dl-tag svg { flex: none; }
 .dl.below .dl-tag { bottom: auto; top: 100%; border-radius: 0 4px 4px 4px; }
 .dl:hover .dl-tag { filter: brightness(1.08); }
@@ -774,7 +818,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   cursor: pointer;
 }
 .tchip:hover { background: color-mix(in srgb, var(--c) 40%, var(--bg)); }
-.tk-t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tk-t { overflow: hidden; min-width: 0; }
 .tchip.done { opacity: 0.6; }
 .tchip.done .tk-t { text-decoration: line-through; }
 
@@ -883,7 +927,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mchip:hover { background: var(--bg-3); }
 .mchip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cl); flex: none; }
 .mchip .mt { color: var(--fg-2); flex: none; }
-.mchip .mtt { overflow: hidden; text-overflow: ellipsis; }
+.mchip .mtt { min-width: 0; overflow: hidden; }
 .mchip { cursor: pointer; }
 .mchip.dline svg { flex: none; color: var(--cl); }
 .mchip.dline .mtt { color: var(--ci); font-weight: 600; }
@@ -1138,6 +1182,11 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.4); }
 
 /* Event editor: show only the controls that apply. */
 .editor.all-day .time { display: none; }
+.clear-time { color: var(--fg-3); }
+.editor.no-time .clear-time { display: none; }
+.editor:not(.no-time) .no-time-hint { display: none; }
+.work-row .ctl { flex-wrap: nowrap; }
+.work-row .ctl > select { flex: 1 1 0; min-width: 0; }
 .editor.is-deadline .ev-only,
 .editor:not(.is-deadline) .dl-only,
 .editor.is-deadline .shape-row,

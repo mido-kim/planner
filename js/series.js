@@ -1,4 +1,4 @@
-import { addDays, dateOf, diffDays, shiftDays } from './dates.js';
+import { absMin, addDays, dateOf, diffDays, fromAbsMin, shiftDays, weekday } from './dates.js';
 import { alignStart, occurrenceDates } from './recurrence.js';
 import { uid } from './util.js';
 
@@ -126,4 +126,22 @@ export function saveOps(events, ev, date, form, scope) {
       : { ...e, seriesId: null, originalDate: null })));
   }
   return ops;
+}
+
+// Moving the occurrence on `date` by `minutes` (whole days for all-day
+// events), as a save with `scope`. Moving a weekly series to other days
+// moves its weekdays along with it.
+export function moveOps(events, ev, date, minutes, scope) {
+  const master = masterOf(events, ev);
+  const k = diffDays(dateOf(ev.start), date);
+  const start = shiftDays(ev.start, k);
+  const end = shiftDays(ev.end, k);
+  const shift = (v) => (v.length > 10 ? fromAbsMin(absMin(v) + minutes) : addDays(v, Math.round(minutes / 1440)));
+  const days = diffDays(dateOf(start), dateOf(shift(start)));
+  let rrule = ev.rrule || master?.rrule || null;
+  if (rrule && scope !== 'this' && rrule.freq === 'weekly' && days % 7) {
+    const from = rrule.byWeekday?.length ? rrule.byWeekday : [weekday(dateOf(start))];
+    rrule = { ...rrule, byWeekday: from.map((d) => (((d + days) % 7) + 7) % 7) };
+  }
+  return saveOps(events, ev, date, { start: shift(start), end: shift(end), rrule }, scope);
 }

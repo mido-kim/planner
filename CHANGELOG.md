@@ -3,6 +3,24 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.0 (2026-10-15)
+
+- Working hours (10 AM – 9 PM, Monday to Friday) are very lightly shaded on
+  the timelines, except on Korean public holidays. Change the hours or turn
+  the shading off in Settings.
+- Korean public holidays from 2026 to 2031 are built in, with substitute
+  holidays, 노동절, 제헌절 and election days. Their dates show in red, with the
+  holiday's name when you point at them.
+- The day now runs until 2 AM the next morning (Settings → Day ends at). Things
+  after midnight show at the bottom of the evening before.
+- Deadlines and tasks can lose their time: tap the × next to the time. A
+  deadline without a time is due any time that day and shows at the day's end.
+- Text that doesn't fit is cut off and fades out toward the end, instead of
+  ending in "…".
+- Drag events, deadlines and tasks to another time or day (on a phone, hold
+  one for a moment first). Repeating events ask whether to move just that one,
+  the following ones or all. Undo is offered after each move.
+
 ## 0.4.0 (2026-10-14)
 
 - New "Gelato Days" colors: soft pastel pink, green, yellow, blue, purple and

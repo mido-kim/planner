@@ -21,6 +21,13 @@ and setup, CHANGELOG.md for history.
   narrow screens (the lower part), `.lay-sheet` for the month view on narrow
   screens.
 - `js/labels.js`: label colors, usage, retire and delete (as write ops).
+- `js/holidays.js`: Korean public holidays 2026–2031 (dates → names). Extend
+  it each year; working-hours shading skips these days.
+- The day can run past midnight (`settings.dayEnd` up to 28 = 4 AM):
+  `slotOf` in timegrid.js puts the small hours in the previous day's column.
+- main.js also has moving by drag (`beginMove` / `updateMove` / `endMove`,
+  writes via `moveOps` in series.js) and `fitText`, which fades text that's
+  cut off (`.fade` / `.fade-last`); the app never uses "…".
 - `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
   label picker), scope dialog, task editor, labels manager, create menu,
   settings.

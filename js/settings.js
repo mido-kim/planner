@@ -5,11 +5,15 @@ const KEY = 'planner.settings.v1';
 
 export const DEFAULTS = {
   dayStart: 7, // first hour shown in day and week views
-  dayEnd: 24, // last hour shown (24 = midnight)
+  dayEnd: 26, // last hour shown; past 24 runs into the next morning (26 = 2 AM)
   weekStart: 0, // 0 = Sunday, 1 = Monday
   h24: false,
   hourHeight: 30, // pixels per hour
   view: 'week',
+  // Working hours, shaded on weekdays that aren't public holidays.
+  showWork: true,
+  workStart: 10,
+  workEnd: 21,
   // The agenda panel. On a PC it sits at the right or the bottom, and can be
   // hidden; on a phone it fills the bottom part of the screen (except in the
   // month view, where it comes up as a sheet).
@@ -30,6 +34,11 @@ export function loadSettings() {
   if (!saved.rev) {
     if (saved.hourHeight === 52) delete saved.hourHeight;
     saved.rev = 2;
+  }
+  // 0.5.0: the day runs to 2 AM unless it was set to end earlier.
+  if (saved.rev < 3) {
+    if (saved.dayEnd === 24) delete saved.dayEnd;
+    saved.rev = 3;
   }
   return { ...DEFAULTS, ...saved };
 }
