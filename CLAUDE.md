@@ -42,7 +42,9 @@ and setup, CHANGELOG.md for history.
   Colors are the "Gelato Days" pastels: each item color class sets `--c`
   (pastel), `--ci` (ink for text), `--cl` (mid tone for lines and dots) and
   `--cf` (block fill). The accent is pink (`--accent`, `--accent-strong`,
-  `--accent-ink`).
+  `--accent-ink`). Fonts: `--font-ui` (Instrument Serif, `fonts/*.woff`, one
+  weight, `font-synthesis: none`) for everything except item names, which use
+  `--font-item` (Arial; selector list under "Base").
 - `sw.js`: offline cache. **Add any new file to `SHELL`.**
 - `js/demo.js`: design preview (`?demo`), in-memory sample data. DESIGN.md has
   the Figma workflow, layer names and the URL options.

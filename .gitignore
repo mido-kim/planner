@@ -5,3 +5,7 @@
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Downloaded font packages: only the converted .woff files and the license are used
+fonts/*.zip
+fonts/Instrument_Serif/

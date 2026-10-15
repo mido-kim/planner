@@ -3,6 +3,12 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.1 (2026-10-15)
+
+- New font: Instrument Serif for the app itself (the dates at the top, view
+  buttons, day numbers, hours, times, headings and buttons). Names of events,
+  deadlines and tasks stay in Arial for now. Korean text keeps its usual font.
+
 ## 0.5.0 (2026-10-15)
 
 - Working hours (10 AM – 9 PM, Monday to Friday) are very lightly shaded on

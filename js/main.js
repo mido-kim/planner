@@ -51,6 +51,8 @@ boot();
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   wireEvents();
+  // Text widths change once the web font arrives, so cut text is checked again.
+  document.fonts?.ready.then(() => store && fitText(app));
   const params = new URLSearchParams(location.search);
   if (params.has('demo')) return startDemo(params);
   if (!firebaseConfig) return start(localStore());

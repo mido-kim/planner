@@ -25,9 +25,11 @@ touch the code.
     the text color on each event color.
   - *Size*: PC and Phone modes (`layout/hour-height` = how tall an hour is,
     `layout/hour-column-width`, `radius/event`, …).
-- **Text styles** use Arimo, a free font with exactly Arial's letter widths
-  (Figma's connector can't use Arial itself). The app uses Arial, with Apple SD
-  Gothic Neo (iPhone) or Malgun Gothic (Windows) for Korean.
+- **Fonts in the app:** Instrument Serif (regular and italic, no bold) for the
+  app's own text; Arial for the names of events, deadlines and tasks. Korean
+  comes from Apple SD Gothic Neo (iPhone) or Malgun Gothic (Windows).
+- **Text styles** in Figma still use Arimo (Arial's letter widths) and haven't
+  been switched to Instrument Serif yet.
 
 Not drawn in Figma yet: the agenda panel (right / bottom, and the phone's
 lower half), the 2-week timelines, the month view and Settings. Colors are

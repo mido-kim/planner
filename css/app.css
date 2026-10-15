@@ -1,5 +1,22 @@
 /* ------------------------------------------------------------------ Tokens */
 
+/* Instrument Serif (OFL, fonts/InstrumentSerif-OFL.txt) for the app's own
+   text. It has one weight, so nothing is bolded artificially. */
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../fonts/InstrumentSerif-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("../fonts/InstrumentSerif-Italic.woff") format("woff");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
 /* "Gelato Days" pastels: #FFCBE1 #D6E5BD #F9E1A8 #BCD8EC #DCCCEC #FFDAB4,
    plus mint, coral and stone mixed to match. Each item color has a pastel
    fill (--c-*) and a dark "ink" (--ink-*) for text and lines on it. */
@@ -49,8 +66,14 @@
   --ink-purple: #6243a0;
   --ink-gray: #5e5853;
 
-  /* Arial everywhere, with a Korean font for Hangul (Arial has none). */
-  font-family: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  /* Instrument Serif for the app itself (titles, buttons, dates, labels);
+     Arial for the names of events, deadlines and tasks, and what you type for
+     them. Neither has Korean letters, which come from Apple SD Gothic Neo
+     (iPhone) or Malgun Gothic (Windows). */
+  --font-ui: "Instrument Serif", Georgia, "Apple SD Gothic Neo", "Malgun Gothic", serif;
+  --font-item: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  font-family: var(--font-ui);
+  font-synthesis: none;
   font-size: 14px;
   line-height: 1.4;
 }
@@ -133,6 +156,10 @@ body {
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Names of events, deadlines and tasks, and the fields where you type them. */
+.ev-t, .bar-t, .ct, .tk-t, .mtt, .ag-title, .ag-notes,
+.title-input, .editor textarea, .task-add input[name="title"] { font-family: var(--font-item); }
 
 button { cursor: pointer; }
 
@@ -242,7 +269,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .new-group .nb:hover { background: color-mix(in srgb, var(--accent-fg) 14%, transparent); }
 
 .range-title {
-  font-size: 19px;
+  font-size: 25px;
+  line-height: 1.15;
   font-weight: 650;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -273,6 +301,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   border-radius: 7px;
   background: transparent;
   color: var(--fg-2);
+  font-size: 15px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -315,7 +344,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
     padding: 8px 10px;
   }
   .title-wrap { padding-left: 2px; }
-  .range-title { font-size: 18px; }
+  .range-title { font-size: 23px; }
   .seg { justify-self: end; }
   .seg button { padding: 0 10px; }
   .seg .lg { display: none; }
@@ -390,7 +419,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   height: 28px;
   padding: 0 4px;
   border-radius: 14px;
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 600;
 }
 .tg-dayhead:hover .dom { background: var(--bg-hover); }
@@ -629,7 +658,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .tg.n7 .tchip { font-size: 10px; padding: 0 3px 0 2px; gap: 2px; }
   .tg.n7 .dl-tag { font-size: 9.5px; padding: 0 3px 0 2px; }
   .tg.n7 .dl-tag svg { display: none; }
-  .tg-dayhead .dom { font-size: 15px; min-width: 26px; height: 26px; }
+  .tg-dayhead .dom { font-size: 18px; min-width: 26px; height: 26px; }
 }
 
 /* ------------------------------------------------------------------ Two weeks */
@@ -657,7 +686,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   background: none;
 }
 .tw-dayhead .dow { font-size: 10.5px; font-weight: 600; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; }
-.tw-dayhead .dom { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.tw-dayhead .dom { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; font-size: 15px; font-weight: 700; white-space: nowrap; }
 .tw-dayhead:hover .dom { background: var(--bg-hover); }
 .tw-dayhead.today .dow { color: var(--accent-ink); }
 .tw-dayhead.today .dom { background: var(--accent); color: var(--accent-fg); }
@@ -695,7 +724,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 @media (max-width: 760px) {
   .tw-week { --tw-axis: 24px; }
   .tw-dayhead { flex-direction: column; gap: 0; height: 36px; }
-  .tw-dayhead .dom { min-width: 20px; height: 20px; font-size: 12px; }
+  .tw-dayhead .dom { min-width: 20px; height: 20px; font-size: 14px; }
   .tw-axis span { right: 3px; font-size: 8.5px; }
   .ev.mini { padding: 0 2px; font-size: 9px; }
 }
@@ -902,7 +931,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   height: 24px;
   padding: 0 6px;
   border-radius: 12px;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -948,7 +977,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .mv .bar { font-size: 10px; }
   .mv .bar.shape-block { padding: 0 3px; }
   .mv-more { font-size: 10px; padding: 0 2px; }
-  .mv-num span { font-size: 11.5px; min-width: 22px; height: 22px; }
+  .mv-num span { font-size: 13px; min-width: 22px; height: 22px; }
 }
 
 /* ------------------------------------------------------------------ Agenda panel */
@@ -981,7 +1010,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 .tasks-head { display: flex; align-items: flex-start; gap: 2px; padding: 14px 8px 8px 14px; }
 .tasks-head > div { flex: 1; min-width: 0; }
-.tasks-head h2 { font-size: 16px; font-weight: 700; }
+.tasks-head h2 { font-size: 22px; font-weight: 400; line-height: 1.1; }
 .tasks-head .sub { font-size: 12px; color: var(--fg-3); margin-top: 1px; }
 .lay-bottom .tasks-head { align-items: center; padding: 10px 8px 6px 14px; }
 .lay-bottom .tasks-head > div { display: flex; align-items: baseline; gap: 8px; }
@@ -1110,7 +1139,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.4); }
   gap: 8px;
   padding: 14px 14px 8px 18px;
 }
-.dlg-head h2 { flex: 1; font-size: 17px; font-weight: 650; }
+.dlg-head h2 { flex: 1; font-size: 22px; font-weight: 400; }
 .title-input {
   flex: 1;
   height: 40px !important;
