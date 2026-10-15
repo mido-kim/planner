@@ -174,6 +174,10 @@ function allDayStrip(days, cols, bars, { rowH, h24, color, cls }) {
 
 const byDoneThenCreated = (a, b) => a.done - b.done || (a.createdAt || 0) - (b.createdAt || 0);
 
+// Where things with a date but no time go: midnight, when the day runs past
+// it; otherwise the bottom of the day.
+export const dayEndAt = (H0, H1, colH, ppm) => (H1 > 1440 && H0 < 1440 ? (1440 - H0) * ppm : colH - 1);
+
 // `fitHeight`: the room for the whole view, in pixels. The day is then
 // squeezed to fit it, so nothing scrolls up and down; `headH` is the height
 // of the day headers. Without it, an hour is `settings.hourHeight` tall.
@@ -228,19 +232,16 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
         html.push(taskChip(m.task, color(m.task, 'none'), 'tchip', '', `top:${top}px`));
       }
     }
-    // Date-only deadlines are lines at the very end of the day.
-    endLines.forEach((occ, k) => {
-      const top = colH - 1 - k * (TAG_PX + 2);
-      tags.push([top - TAG_PX, top + 1]);
-      html.push(deadlineLine(occ, `${top}px`, h24, color(occ.ev), false));
+    // A date but no time: around midnight. Deadlines are lines at 12 AM with
+    // their tag above; tasks sit just after it, or just before when there's
+    // no room. (main.js then moves them clear of other labels.)
+    const mid = dayEndAt(H0, H1, colH, ppm);
+    endLines.forEach((occ, k) => html.push(deadlineLine(occ, `${mid - k * (TAG_PX + 2)}px`, h24, color(occ.ev), false)));
+    const below = colH - mid >= bottom.length * (TASK_PX + 2) + 2;
+    bottom.sort(byDoneThenCreated).forEach((task, k) => {
+      const top = below ? mid + 2 + k * (TASK_PX + 2) : mid - (endLines.length ? TAG_PX : 0) - (k + 1) * (TASK_PX + 2);
+      html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:${top}px`));
     });
-    // Date-only tasks stack up from the bottom, above any deadline tag there.
-    let y = colH - TASK_PX - 2;
-    for (const task of bottom.sort(byDoneThenCreated)) {
-      for (let hit = tags.find(([a, b]) => y < b && y + TASK_PX > a); hit; hit = tags.find(([a, b]) => y < b && y + TASK_PX > a)) y = hit[0] - TASK_PX - 2;
-      html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:${y}px`));
-      y -= TASK_PX + 2;
-    }
     if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * ppm}px"></div>`);
     const cls = ['tg-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
     return `<div class="${cls}" data-date="${d}" style="z-index:${n - i}">${html.join('')}</div>`;
@@ -302,10 +303,10 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
           html.push(taskChip(m.task, color(m.task, 'none'), 'tchip', '', `top:calc(${m.top}% + ${stack * MINI_TASK_PX}px)`));
         }
       }
-      endLines.forEach((occ, k) => html.push(deadlineLine(occ, `calc(100% - ${1 + k * 14}px)`, h24, color(occ.ev), false)));
-      const lift = endLines.length * 14;
+      const mid = H1 > 1440 && H0 < 1440 ? `${(1440 - H0) * pct}%` : '100% - 1px';
+      endLines.forEach((occ, k) => html.push(deadlineLine(occ, `calc(${mid} - ${k * 14}px)`, h24, color(occ.ev), false)));
       bottom.sort(byDoneThenCreated).forEach((task, k) =>
-        html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:calc(100% - ${lift + (k + 1) * MINI_TASK_PX}px)`)));
+        html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:calc(${mid} + ${2 + k * MINI_TASK_PX}px)`)));
       if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * pct}%"></div>`);
       const cls = ['tw-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
       return `<div class="${cls}" data-date="${d}" style="z-index:${7 - i}">${html.join('')}</div>`;
@@ -326,7 +327,7 @@ function chip(occ, color, cls, html, style) {
 // A task with a tick box. Ticking marks it done; anywhere else opens it.
 function taskChip(task, color, cls, before, style) {
   const title = esc(task.title || '(No title)');
-  return `<div class="${cls} c-${color}${task.done ? ' done' : ''}" style="${style}" role="button" tabindex="0" data-task="${esc(task.id)}" title="${title}${task.done ? ' (done)' : ''}">${before}<input type="checkbox" data-toggle="${esc(task.id)}" ${task.done ? 'checked' : ''} aria-label="Done"><span class="tk-t">${title}</span></div>`;
+  return `<div class="${cls} c-${color}${task.done ? ' done' : ''}" style="${style}" role="button" tabindex="0" data-task="${esc(task.id)}"${task.dueTime ? '' : ' data-notime'} title="${title}${task.done ? ' (done)' : ''}">${before}<input type="checkbox" data-toggle="${esc(task.id)}" ${task.done ? 'checked' : ''} aria-label="Done"><span class="tk-t">${title}</span></div>`;
 }
 
 function deadlineLine(occ, top, h24, color, below) {

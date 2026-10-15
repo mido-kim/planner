@@ -6,7 +6,7 @@ import { deleteOps, moveOps, saveOps } from '../js/series.js';
 import { HOLIDAYS } from '../js/holidays.js';
 import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
-import { isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
+import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
 
 const results = [];
 function test(name, fn) {
@@ -345,6 +345,12 @@ test('the day fits the space given: no scrolling up and down', () => {
   if (!html.includes('class="tg n1 fit') || !html.includes('class="tg-axis" style="height:523px"')) throw new Error('not fitted to 523px');
   // Too little room for a usable hour: it scrolls at the usual hour height instead.
   if (renderTimeGrid({ days: ['2026-10-14'], occs: [], settings, fitHeight: 150, headH: 52 }).includes(' fit')) throw new Error('should not squeeze below 8px an hour');
+});
+
+test('no time: tasks and deadlines go at midnight, or at the bottom when the day ends earlier', () => {
+  eq(dayEndAt(7 * 60, 26 * 60, 570, 0.5), 510); // 7 AM to 2 AM at 30px an hour: 12 AM is 510px down
+  eq(dayEndAt(7 * 60, 24 * 60, 510, 0.5), 509);
+  eq(dayEndAt(7 * 60, 22 * 60, 450, 0.5), 449);
 });
 
 // ---- holidays and working hours

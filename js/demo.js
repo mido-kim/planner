@@ -38,6 +38,8 @@ export function demoStore(weekStart) {
     ev('demo-abstract', 'Abstract due', null, at(3, 17), at(3, 17), { kind: 'deadline', labelId: 'demo-l-research' }),
     ev('demo-hw', 'HW 3 grades due', null, at(5, 23, 59), at(5, 23, 59), { kind: 'deadline', labelId: 'demo-l-teaching' }),
     ev('demo-old', 'Old project report', null, at(10, 12), at(10, 12), { kind: 'deadline', labelId: 'demo-l-old' }),
+    ev('demo-ko', '연구실 세미나 준비', null, at(1, 13), at(1, 14, 30), { labelId: 'demo-l-research' }),
+    ev('demo-scholar', '장학금 서류 마감', null, day(3), day(3), { kind: 'deadline', allDay: true, labelId: 'demo-l-personal' }),
   ];
   const task = (id, title, due, extra = {}) => ({
     id, title, due, dueTime: null, labelId: null, color: null, notes: '', done: false, doneAt: null, createdAt: now, updatedAt: now, ...extra,
@@ -49,6 +51,8 @@ export function demoStore(weekStart) {
     task('demo-t4', 'Grade homework 2', day(5), { labelId: 'demo-l-teaching', notes: 'Due to the professor by Friday.' }),
     task('demo-t5', 'Read the new organoid paper', null),
     task('demo-t6', 'Pick up dry cleaning', day(2), { dueTime: '11:00', labelId: 'demo-l-personal' }),
+    task('demo-t7', '학회 발표자료 만들기', day(3), { labelId: 'demo-l-research' }),
+    task('demo-t8', 'Email the committee', day(3), { dueTime: '23:45', labelId: 'demo-l-teaching' }),
   ];
 
   const data = {

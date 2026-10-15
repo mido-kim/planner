@@ -161,6 +161,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Names of events, deadlines and tasks, and the fields where you type them. */
 .ev-t, .bar-t, .ct, .tk-t, .mtt, .ag-title, .ag-notes,
 .title-input, .editor textarea, .task-add input[name="title"] { font-family: var(--font-item); }
+/* Korean names break between words, not inside them. */
+.ev-t, .bar-t, .ct, .tk-t, .mtt, .ag-title, .ag-notes, .lname { word-break: keep-all; }
+.ag-title, .ag-notes, .lname { overflow-wrap: break-word; }
 
 button { cursor: pointer; }
 
@@ -832,11 +835,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   gap: 3px;
   max-width: calc(100% - 2px);
   height: 16px;
-  padding: 0 5px 0 4px;
-  border-radius: 4px 4px 4px 0;
-  background: var(--cf);
+  padding: 0 4px 0 1px;
   color: var(--ci);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cl) 45%, transparent);
   font-size: 10.5px;
   font-weight: 600;
   line-height: 16px;
@@ -844,8 +844,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .dl-tag span { min-width: 0; overflow: hidden; }
 .dl-tag svg { flex: none; }
-.dl.below .dl-tag { bottom: auto; top: 100%; border-radius: 0 4px 4px 4px; }
-.dl:hover .dl-tag { filter: brightness(1.08); }
+.dl.below .dl-tag { bottom: auto; top: 100%; }
+.dl-tag svg { color: var(--cl); }
+.dl:hover .dl-tag { background: color-mix(in srgb, var(--c) 35%, transparent); border-radius: 4px; }
 
 /* A task: its title in its color beside a small round tick box, without an
    outline. In the week and 2-week views it may run on over the next day. */
@@ -860,15 +861,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   height: 18px;
   padding: 0 5px 0 2px;
   border-radius: 5px;
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
   color: var(--ci);
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
 }
-.tg:not(.n1) .tchip, .tw .tchip { max-width: calc(200% - 6px); }
-.tchip:hover { background: color-mix(in srgb, var(--c) 40%, var(--bg)); }
+.tchip:hover { background: color-mix(in srgb, var(--c) 35%, transparent); }
+/* Too long for its day: over the next day when that spot is free there,
+   otherwise on more lines. */
+.tchip.spill { max-width: calc(200% - 6px); }
+.tchip.wrap { height: auto; min-height: 18px; align-items: flex-start; padding-top: 2px; padding-bottom: 2px; white-space: normal; line-height: 1.2; }
+.tchip.wrap input { margin-top: 1px; }
+.dl.spill .dl-tag { max-width: calc(200% - 2px); }
+.dl.wrap .dl-tag { height: auto; align-items: flex-start; white-space: normal; line-height: 1.2; }
+.dl.wrap .dl-tag svg { margin-top: 2px; }
 .tk-t { overflow: hidden; min-width: 0; }
 .tchip.done { opacity: 0.55; }
 .tchip.done .tk-t { text-decoration: line-through; }
@@ -977,14 +984,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mchip.mtask input { flex: none; }
 .mchip.mtask .mtt { color: var(--ci); font-weight: 600; }
 .mchip.mtask.done .mtt { text-decoration: line-through; color: var(--fg-3); }
-/* A task may run on over the next day; the cell clips only top and bottom. */
-.mchip.mtask {
+/* A task or deadline may run on over the next day when that spot is free
+   there; the cell clips only top and bottom. */
+.mchip.spill {
   position: relative;
   z-index: 2;
   width: max-content;
   min-width: 100%;
   max-width: 200%;
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
 }
 .mv-more { padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--fg-2); cursor: pointer; border-radius: 4px; }
 .mv-more:hover { background: var(--bg-3); }
@@ -1080,6 +1087,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .ag:hover { filter: brightness(0.98) saturate(1.15); }
 .ag.tent { background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--cl); }
+.ag.task, .ag.dline { background: transparent; }
+.ag.task:hover, .ag.dline:hover { filter: none; background: var(--bg-hover); }
 .ag-dot { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--cl); }
 .ag.tent .ag-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--cl); }
 .ag-flag { flex: none; display: inline-flex; margin-top: 1px; color: var(--cl); }

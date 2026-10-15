@@ -3,6 +3,20 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.5 (2026-10-15)
+
+- Tasks and deadlines have no background any more, on the calendar and in the
+  agenda: just the round tick box or flag, and the name in its color. Event
+  cards in the agenda keep their pastel.
+- Deadline names may run on over the next day too. A task or deadline name
+  only does so when that spot is free on the next day; otherwise it wraps onto
+  more lines in its own day (in the month view it's cut and faded).
+- Tasks and deadlines without a time now sit around midnight (11:59 PM –
+  12 AM) instead of at the very end of the day (2 AM). One that would land on
+  another task or deadline moves a little up or down so their names don't
+  overlap.
+- Korean names break between words, not in the middle of one.
+
 ## 0.5.4 (2026-10-15)
 
 - Smoother swipes: the calendar follows your finger, and when you let go past
