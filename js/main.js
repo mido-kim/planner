@@ -476,10 +476,10 @@ function shiftWeek(dir) {
   slide(dir > 0 ? 'up' : 'down');
 }
 
-// The new dates slide in from the side they came from.
+// The new dates slide in from the side they came from (fade in, with Reduce
+// Motion on).
 function slide(dir) {
-  const el = $('#cal')?.firstElementChild;
-  if (el) el.classList.add(`slide-${dir}`);
+  $('#cal')?.firstElementChild?.classList.add(`slide-${dir}`);
 }
 
 // Going straight to a date shows its whole month again.
@@ -959,34 +959,80 @@ function wireMoves() {
 // move, still work as before.
 let gestureUsed = false; // the touch became a selection or a move
 
+// The calendar follows the finger while swiping; let go past a quarter of the
+// way (or with a quick flick) and it carries on out while the next dates
+// slide in, otherwise it springs back.
+const EASE_OUT = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function wireSwipes() {
   let sw = null;
+  let busy = false; // a swipe is still finishing its animation
+  const reset = (el) => {
+    el.style.transition = '';
+    el.style.transform = '';
+    el.style.opacity = '';
+  };
+  const springBack = (s) => {
+    s.el.style.transition = `transform 0.3s ${EASE_OUT}`;
+    s.el.style.transform = '';
+    setTimeout(() => s.el.isConnected && reset(s.el), 320);
+  };
   app.addEventListener('touchstart', (e) => {
     sw = null;
     gestureUsed = false;
-    if (e.touches.length !== 1 || !e.target.closest('#cal')) return;
+    if (busy || e.touches.length !== 1 || !e.target.closest('#cal')) return;
     const t = e.touches[0];
-    sw = { x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, dy: 0 };
+    const axis = state.view === 'day' || state.view === 'week' ? 'x' : 'y';
+    sw = { x: t.clientX, y: t.clientY, t: Date.now(), d: 0, axis, on: false, el: $('#cal').firstElementChild };
   }, { passive: true });
   app.addEventListener('touchmove', (e) => {
     if (!sw) return;
-    if (e.touches.length !== 1) sw = null;
-    else {
-      sw.dx = e.touches[0].clientX - sw.x;
-      sw.dy = e.touches[0].clientY - sw.y;
+    if (e.touches.length !== 1 || gestureUsed || sel || mv) {
+      if (sw.on) springBack(sw);
+      sw = null;
+      return;
     }
+    const dx = e.touches[0].clientX - sw.x;
+    const dy = e.touches[0].clientY - sw.y;
+    if (!sw.on) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) return;
+      // Only a swipe along the view's own direction moves it.
+      if ((Math.abs(dx) > Math.abs(dy) ? 'x' : 'y') !== sw.axis) {
+        sw = null;
+        return;
+      }
+      sw.on = true;
+      sw.el.style.transition = 'none';
+      sw.el.style.willChange = 'transform';
+    }
+    sw.d = sw.axis === 'x' ? dx : dy;
+    sw.el.style.transform = `translate${sw.axis.toUpperCase()}(${sw.d}px)`;
   }, { passive: true });
   app.addEventListener('touchend', () => {
     const s = sw;
     sw = null;
-    if (!s || gestureUsed || sel || mv || Date.now() - s.t > 700) return;
-    const ax = Math.abs(s.dx);
-    const ay = Math.abs(s.dy);
-    if (state.view === 'day' || state.view === 'week') {
-      if (ax > 60 && ax > ay * 1.5) move(s.dx < 0 ? 1 : -1);
-    } else if (ay > 50 && ay > ax * 1.5) shiftWeek(s.dy < 0 ? 1 : -1);
+    if (!s?.on) return;
+    const size = s.axis === 'x' ? s.el.clientWidth : s.el.clientHeight;
+    const speed = Math.abs(s.d) / Math.max(1, Date.now() - s.t); // px per ms
+    if (Math.abs(s.d) < size * 0.25 && !(speed > 0.4 && Math.abs(s.d) > 30)) return springBack(s);
+    const dir = s.d < 0 ? 1 : -1;
+    const go = () => (s.axis === 'x' ? move(dir) : shiftWeek(dir));
+    // With Reduce Motion on, the old dates fade out where they are instead.
+    const still = reducedMotion();
+    busy = true;
+    s.el.style.transition = still ? 'opacity 0.12s ease-in' : 'transform 0.14s ease-in, opacity 0.14s ease-in';
+    if (!still) s.el.style.transform = `translate${s.axis.toUpperCase()}(${-dir * size * 0.45}px)`;
+    s.el.style.opacity = '0';
+    setTimeout(() => {
+      busy = false;
+      go();
+    }, still ? 120 : 140);
   });
-  app.addEventListener('touchcancel', () => (sw = null));
+  app.addEventListener('touchcancel', () => {
+    if (sw?.on) springBack(sw);
+    sw = null;
+  });
 }
 
 function wireGestures() {

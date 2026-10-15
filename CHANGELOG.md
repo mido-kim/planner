@@ -3,6 +3,18 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.4 (2026-10-15)
+
+- Smoother swipes: the calendar follows your finger, and when you let go past
+  about a quarter of the way (or flick) it glides out while the next dates
+  glide in; a short drag springs back. With Reduce Motion on (iPhone Settings →
+  Accessibility → Motion) the dates fade instead of sliding.
+- Tasks on the calendar: a small round tick box instead of a square, no
+  outline, and the title in the task's color. The agenda uses the same round
+  tick box.
+- In the week, 2-week and month views, a task's title may run on over the
+  next day instead of being cut at its own day's edge.
+
 ## 0.5.3 (2026-10-15)
 
 - The Day and Week views now fit the whole day on the screen, so the timeline

@@ -128,7 +128,7 @@ dark-mode block.
 | 2-week view | Two week rows; 30px day header, all-day strip (16px bars), then a timeline squeezed to fit; labels every 3 hours; blocks show the title only |
 | Event bar (all-day row) | 20px tall (18 in month, 16 phone), 5px corners, 11.5px text; Block = solid color, Arrows/Line = 2px line with the title in the middle, 8 × 10px arrowheads |
 | Deadline | 2px line across the day; title tag 16px tall, 10.5px bold white text on the color, 4px corners (square where it meets the line) |
-| Calendar task | 18px tall, 5px corners, 1px color outline, 12px tick box, 11px text |
+| Calendar task | 18px tall, no outline, 78% of the background behind it; a 10px round tick box (1.5px ring in the item's mid tone; done = filled with a white tick); title 11px bold in the item's ink. In week, 2-week and month it may run up to two days wide |
 | Now line | 2px red, 10px dot |
 | Month cell | date 12.5px in a 24px circle; events 18px tall, 11.5px text; "+N more" |
 | Agenda panel | PC: 320px wide at the right (240–60% of the window, drag to resize) or 40% high at the bottom; phone: the lower 50% (20–80%), a sheet over the month view. Cards: 12px corners, 60% of the item's pastel, title 14px bold, time 12.5px in its ink, label and repeat 12px, notes 13px |

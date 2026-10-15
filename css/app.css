@@ -46,6 +46,7 @@
   --fill: 100%; /* how much of an item's pastel shows in its fill */
   --work: rgba(70, 60, 66, 0.04); /* working hours, very lightly shaded */
   --today-tint: 16%; /* today's column: this much of the accent */
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3.2 6.3l1.9 1.9 3.8-4.4' fill='none' stroke='white' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
   --c-blue: #bcd8ec;
   --c-teal: #bfe6dd;
@@ -379,19 +380,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Moving to the next or previous dates: they slide in from that side. */
-@keyframes from-right { from { transform: translateX(36px); opacity: 0.35; } }
-@keyframes from-left { from { transform: translateX(-36px); opacity: 0.35; } }
-@keyframes from-below { from { transform: translateY(36px); opacity: 0.35; } }
-@keyframes from-above { from { transform: translateY(-36px); opacity: 0.35; } }
-.slide-left { animation: from-right 0.2s ease-out; }
-.slide-right { animation: from-left 0.2s ease-out; }
-.slide-up { animation: from-below 0.2s ease-out; }
-.slide-down { animation: from-above 0.2s ease-out; }
+@keyframes from-right { from { transform: translateX(30%); opacity: 0; } }
+@keyframes from-left { from { transform: translateX(-30%); opacity: 0; } }
+@keyframes from-below { from { transform: translateY(22%); opacity: 0; } }
+@keyframes from-above { from { transform: translateY(-22%); opacity: 0; } }
+.slide-left { animation: from-right 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.slide-right { animation: from-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.slide-up { animation: from-below 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.slide-down { animation: from-above 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes fade-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .slide-left, .slide-right, .slide-up, .slide-down { animation: none; }
+  .slide-left, .slide-right, .slide-up, .slide-down { animation: fade-in 0.22s ease-out; }
 }
 
 /* ------------------------------------------------------------------ Timeline (day / week / 2 weeks) */
@@ -414,11 +417,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tg-corner, .tg-dayhead {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: 20;
   height: var(--head-h);
   background: var(--bg);
 }
-.tg-corner { left: 0; z-index: 6; }
+.tg-corner { left: 0; z-index: 22; }
 
 .tg-dayhead {
   display: flex;
@@ -449,13 +452,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tg-adlabel, .tg-allday {
   position: sticky;
   top: var(--head-h);
-  z-index: 4;
+  z-index: 20;
   background: var(--bg);
   border-bottom: 1px solid var(--line);
 }
 .tg-adlabel {
   left: 0;
-  z-index: 6;
+  z-index: 22;
   padding: 7px 8px 0 0;
   font-size: 10px;
   color: var(--fg-3);
@@ -494,13 +497,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .chip.oor b { font-weight: 600; color: var(--ci); }
 .chip.oor svg { flex: none; color: var(--cl); }
-.chip.tk-chip input { width: 11px; height: 11px; }
+.chip.oor.tk-chip { border: 0; padding-left: 2px; }
+.chip.tk-chip .tk-t { color: var(--ci); font-weight: 600; }
 .chip.tk-chip.done .tk-t { text-decoration: line-through; color: var(--fg-3); }
 
 .tg-axis {
   position: sticky;
   left: 0;
-  z-index: 3;
+  z-index: 19;
   background: var(--bg);
 }
 .tg-axis span {
@@ -720,7 +724,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   position: relative;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
   border-left: 1px solid var(--line);
   background-image: linear-gradient(var(--line-soft) 1px, transparent 1px);
   background-size: 100% calc(100% / var(--hours));
@@ -738,8 +741,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tw .dl-tag { height: 12px; padding: 0 3px; font-size: 9px; line-height: 12px; }
 .tw .dl-tag svg { display: none; }
 .tw .tchip { height: 15px; gap: 2px; padding: 0 3px 0 2px; border-radius: 4px; font-size: 9.5px; }
-.tw .tchip input { width: 10px; height: 10px; border-radius: 2px; }
-.tw .tchip input:checked::after { left: 2px; top: -0.5px; width: 2.5px; height: 5px; }
+.tw .tchip input { width: 9px; height: 9px; }
 @media (max-width: 760px) {
   .tw-week { --tw-axis: 24px; }
   .tw-dayhead { flex-direction: column; gap: 0; height: 36px; }
@@ -845,7 +847,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .dl.below .dl-tag { bottom: auto; top: 100%; border-radius: 0 4px 4px 4px; }
 .dl:hover .dl-tag { filter: brightness(1.08); }
 
-/* A task: a small chip with a tick box. */
+/* A task: its title in its color beside a small round tick box, without an
+   outline. In the week and 2-week views it may run on over the next day. */
 .tchip {
   position: absolute;
   left: 2px;
@@ -855,50 +858,41 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   align-items: center;
   gap: 4px;
   height: 18px;
-  padding: 0 6px 0 3px;
+  padding: 0 5px 0 2px;
   border-radius: 5px;
-  background: var(--bg);
-  border: 1px solid var(--cl);
-  box-shadow: 0 1px 2px rgba(15, 20, 30, 0.08);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  color: var(--ci);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
 }
+.tg:not(.n1) .tchip, .tw .tchip { max-width: calc(200% - 6px); }
 .tchip:hover { background: color-mix(in srgb, var(--c) 40%, var(--bg)); }
 .tk-t { overflow: hidden; min-width: 0; }
-.tchip.done { opacity: 0.6; }
+.tchip.done { opacity: 0.55; }
 .tchip.done .tk-t { text-decoration: line-through; }
 
-/* The tick box used on calendar tasks. */
-.tchip input, .chip.tk-chip input, .mchip.mtask input {
+/* The round tick box of a task; done shows a white tick on its color. */
+.tchip input, .chip.tk-chip input, .mchip.mtask input, .ag.task input {
   appearance: none;
   -webkit-appearance: none;
   position: relative;
   flex: none;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   margin: 0;
   border: 1.5px solid var(--cl);
-  border-radius: 3px;
-  background: var(--bg);
+  border-radius: 50%;
+  background: transparent;
   cursor: pointer;
 }
-.tchip input:checked, .chip.tk-chip input:checked, .mchip.mtask input:checked { background: var(--cl); }
-.tchip input:checked::after, .chip.tk-chip input:checked::after, .mchip.mtask input:checked::after {
-  content: "";
-  position: absolute;
-  left: 2.5px;
-  top: 0;
-  width: 3px;
-  height: 6px;
-  border: solid #fff;
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
+.tchip input:checked, .chip.tk-chip input:checked, .mchip.mtask input:checked, .ag.task input:checked {
+  background: var(--cl) var(--check) center / 85% no-repeat;
 }
 @media (pointer: coarse) {
-  /* A bigger target around the small box. */
-  .tchip input::before, .mchip.mtask input::before { content: ""; position: absolute; inset: -6px; }
+  /* A bigger target around the small circle. */
+  .tchip input::before, .mchip.mtask input::before { content: ""; position: absolute; inset: -7px; }
 }
 
 /* ------------------------------------------------------------------ Month */
@@ -931,7 +925,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   gap: 1px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: visible;
+  overflow-y: clip;
   padding: 2px 3px 3px;
   border-left: 1px solid var(--line);
   cursor: cell;
@@ -980,7 +975,17 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mchip.dline svg { flex: none; color: var(--cl); }
 .mchip.dline .mtt { color: var(--ci); font-weight: 600; }
 .mchip.mtask input { flex: none; }
+.mchip.mtask .mtt { color: var(--ci); font-weight: 600; }
 .mchip.mtask.done .mtt { text-decoration: line-through; color: var(--fg-3); }
+/* A task may run on over the next day; the cell clips only top and bottom. */
+.mchip.mtask {
+  position: relative;
+  z-index: 2;
+  width: max-content;
+  min-width: 100%;
+  max-width: 200%;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+}
 .mv-more { padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--fg-2); cursor: pointer; border-radius: 4px; }
 .mv-more:hover { background: var(--bg-3); }
 
@@ -1018,7 +1023,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .lay-bottom .tasks { height: var(--panel-h, 50%); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .panel-hidden .tasks, .panel-hidden .splitter, .lay-sheet .splitter { display: none; }
 
-.splitter { flex: none; position: relative; z-index: 8; touch-action: none; }
+.splitter { flex: none; position: relative; z-index: 25; touch-action: none; }
 .lay-right .splitter { width: 10px; margin: 0 -5px; cursor: col-resize; }
 .lay-bottom .splitter { height: 16px; margin: -8px 0; cursor: row-resize; }
 .splitter::after { content: ""; position: absolute; border-radius: 3px; background: var(--line); transition: background 0.15s; }
@@ -1078,7 +1083,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .ag-dot { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--cl); }
 .ag.tent .ag-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--cl); }
 .ag-flag { flex: none; display: inline-flex; margin-top: 1px; color: var(--cl); }
-.ag.task input { flex: none; width: 17px; height: 17px; margin: 1px 0 0; accent-color: var(--cl); cursor: pointer; }
+.ag.task input { width: 15px; height: 15px; margin-top: 2px; border-width: 1.8px; }
 .ag-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ag-title { font-size: 14px; font-weight: 700; color: var(--fg); overflow-wrap: anywhere; }
 .ag-when { font-size: 12.5px; font-weight: 600; color: var(--ci); }
