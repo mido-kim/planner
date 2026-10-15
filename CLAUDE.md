@@ -25,6 +25,8 @@ and setup, CHANGELOG.md for history.
   it each year; working-hours shading skips these days.
 - The day can run past midnight (`settings.dayEnd` up to 28 = 4 AM):
   `slotOf` in timegrid.js puts the small hours in the previous day's column.
+- main.js has swipes (`wireSwipes`: day/week sideways via `move`, 2-week and
+  month by a week via `shiftWeek`; a swiped month keeps `state.monthGrid`).
 - main.js also has moving by drag (`beginMove` / `updateMove` / `endMove`,
   writes via `moveOps` in series.js) and `fitText`, which fades text that's
   cut off (`.fade` / `.fade-last`); the app never uses "…".

@@ -3,6 +3,14 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.2 (2026-10-15)
+
+- Swipe to move through dates on a phone: left or right in the Day and Week
+  views for the next or previous day or week; up or down in the 2-week and
+  Month views to move a week later or earlier. The month's name follows the
+  month that fills most of the screen, and the arrows still go a month at a
+  time. New dates slide in from the side they came from.
+
 ## 0.5.1 (2026-10-15)
 
 - New font: Instrument Serif for the app itself (the dates at the top, view

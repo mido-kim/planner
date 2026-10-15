@@ -381,6 +381,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   flex-direction: column;
 }
 
+/* Moving to the next or previous dates: they slide in from that side. */
+@keyframes from-right { from { transform: translateX(36px); opacity: 0.35; } }
+@keyframes from-left { from { transform: translateX(-36px); opacity: 0.35; } }
+@keyframes from-below { from { transform: translateY(36px); opacity: 0.35; } }
+@keyframes from-above { from { transform: translateY(-36px); opacity: 0.35; } }
+.slide-left { animation: from-right 0.2s ease-out; }
+.slide-right { animation: from-left 0.2s ease-out; }
+.slide-up { animation: from-below 0.2s ease-out; }
+.slide-down { animation: from-above 0.2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .slide-left, .slide-right, .slide-up, .slide-down { animation: none; }
+}
+
 /* ------------------------------------------------------------------ Timeline (day / week / 2 weeks) */
 
 .tg {

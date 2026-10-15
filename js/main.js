@@ -32,6 +32,7 @@ const state = {
   labels: new Map(),
   pending: false,
   sheetOpen: false, // agenda over the month view on narrow screens
+  monthGrid: null, // { from, weeks } once the month view is swiped a week up or down
   showDone: false,
 };
 let store = null;
@@ -177,6 +178,12 @@ function viewRange() {
       return { from: s, to: addDays(s, 14), days: daysFrom(s, 14) };
     }
     case 'month': {
+      if (state.monthGrid) {
+        // Swiped by weeks: the month is the one in the middle row.
+        const { from: gridFrom, weeks } = state.monthGrid;
+        const s = startOfMonth(addDays(gridFrom, Math.floor(weeks / 2) * 7 + 3));
+        return { from: s, to: addMonths(s, 1), gridFrom, gridTo: addDays(gridFrom, weeks * 7), weeks };
+      }
       const s = startOfMonth(d);
       const e = addMonths(s, 1);
       const gridFrom = startOfWeek(s, ws);
@@ -217,7 +224,7 @@ const tasksIn = (from, to) => [...state.tasks.values()].filter((x) => x.due && x
 function render() {
   if (!store) return;
   const r = viewRange();
-  const key = `${state.view}|${r.from}|${settings.weekStart}`;
+  const key = `${state.view}|${r.gridFrom || r.from}|${settings.weekStart}`;
   const rangeChanged = key !== lastRangeKey;
   lastRangeKey = key;
   $('#range-title').textContent = rangeTitle(r);
@@ -449,14 +456,42 @@ function labelAction(type, p) {
 
 function move(dir) {
   const v = state.view;
-  state.date = v === 'day' ? addDays(state.date, dir)
-    : v === 'week' ? addDays(state.date, 7 * dir)
-      : v === '2week' ? addDays(state.date, 14 * dir)
-        : addMonths(state.date, dir);
+  // A month view swiped by weeks moves on from the month it shows.
+  const base = v === 'month' && state.monthGrid ? viewRange().from : state.date;
+  state.monthGrid = null;
+  state.date = v === 'day' ? addDays(base, dir)
+    : v === 'week' ? addDays(base, 7 * dir)
+      : v === '2week' ? addDays(base, 14 * dir)
+        : addMonths(base, dir);
   render();
+  slide(v === 'month' || v === '2week' ? (dir > 0 ? 'up' : 'down') : dir > 0 ? 'left' : 'right');
+}
+
+// The 2-week and month views move a week at a time when swiped.
+function shiftWeek(dir) {
+  if (state.view === 'month') {
+    const r = viewRange();
+    state.monthGrid = { from: addDays(r.gridFrom, 7 * dir), weeks: r.weeks };
+  }
+  state.date = addDays(state.date, 7 * dir);
+  render();
+  slide(dir > 0 ? 'up' : 'down');
+}
+
+// The new dates slide in from the side they came from.
+function slide(dir) {
+  const el = $('#cal')?.firstElementChild;
+  if (el) el.classList.add(`slide-${dir}`);
+}
+
+// Going straight to a date shows its whole month again.
+function goTo(date) {
+  state.date = date;
+  state.monthGrid = null;
 }
 
 function setView(view) {
+  state.monthGrid = null;
   state.view = view;
   settings.view = view;
   persist();
@@ -567,7 +602,7 @@ function wireSplitter() {
 
 const actions = {
   today: () => {
-    state.date = today();
+    goTo(today());
     render();
   },
   prev: () => move(-1),
@@ -918,8 +953,47 @@ function wireMoves() {
   }, true);
 }
 
+// ---------------------------------------------------------------- Swiping
+
+// On touch screens, a quick swipe on the calendar: left or right for the next
+// or previous day or week (day and week views), up or down for a week later
+// or earlier (2-week and month views). Scrolling, and holding to select or
+// move, still work as before.
+let gestureUsed = false; // the touch became a selection or a move
+
+function wireSwipes() {
+  let sw = null;
+  app.addEventListener('touchstart', (e) => {
+    sw = null;
+    gestureUsed = false;
+    if (e.touches.length !== 1 || !e.target.closest('#cal')) return;
+    const t = e.touches[0];
+    sw = { x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, dy: 0 };
+  }, { passive: true });
+  app.addEventListener('touchmove', (e) => {
+    if (!sw) return;
+    if (e.touches.length !== 1) sw = null;
+    else {
+      sw.dx = e.touches[0].clientX - sw.x;
+      sw.dy = e.touches[0].clientY - sw.y;
+    }
+  }, { passive: true });
+  app.addEventListener('touchend', () => {
+    const s = sw;
+    sw = null;
+    if (!s || gestureUsed || sel || mv || Date.now() - s.t > 700) return;
+    const ax = Math.abs(s.dx);
+    const ay = Math.abs(s.dy);
+    if (state.view === 'day' || state.view === 'week') {
+      if (ax > 60 && ax > ay * 1.5) move(s.dx < 0 ? 1 : -1);
+    } else if (ay > 50 && ay > ax * 1.5) shiftWeek(s.dy < 0 ? 1 : -1);
+  });
+  app.addEventListener('touchcancel', () => (sw = null));
+}
+
 function wireGestures() {
   wireMoves();
+  wireSwipes();
   // Mouse and pen: press, drag, let go.
   app.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
@@ -962,6 +1036,7 @@ function wireGestures() {
       p.timer = setTimeout(() => {
         mv = beginMove(item, p.x, p.y);
         p.active = !!mv;
+        gestureUsed = p.active;
       }, LONG_PRESS_MS);
       press = p;
       return;
@@ -971,6 +1046,7 @@ function wireGestures() {
     const p = { surface, x: t.clientX, y: t.clientY, lx: t.clientX, ly: t.clientY, t: Date.now(), active: false };
     p.timer = setTimeout(() => {
       p.active = true;
+      gestureUsed = true;
       beginSelection(surface, p.x, p.y);
       sel.moved = true; // a held finger selects from where it is
       if (sel.type === 'time') {
@@ -1043,7 +1119,7 @@ function wireEvents() {
     if (task) return editTask(task.dataset.task || task.dataset.editTask);
     const go = t.closest('[data-goto]');
     if (go) {
-      state.date = go.dataset.goto;
+      goTo(go.dataset.goto);
       return setView('day');
     }
     if (t.id === 'jump') openDatePicker();
@@ -1053,7 +1129,7 @@ function wireEvents() {
     const t = e.target;
     if (t.dataset.toggle) toggleTask(t.dataset.toggle, t.checked);
     else if (t.id === 'jump' && t.value) {
-      state.date = t.value;
+      goTo(t.value);
       render();
     }
   });

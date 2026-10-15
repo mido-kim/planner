@@ -26,6 +26,8 @@ an app on a PC (Chrome) and an iPhone (Safari).
   calendar, with a tick box.
 - **Gelato colors:** soft pastel colors throughout, in light and dark mode.
 - **Drag to move** events, deadlines and tasks to another time or day.
+- **Swipe** sideways through days and weeks, and up or down through the 2-week
+  and month views a week at a time.
 - **Korean public holidays** (2026–2031) built in; working hours are lightly
   shaded on the other weekdays.
 - **Works offline.** Optional sync between devices through Firebase.
