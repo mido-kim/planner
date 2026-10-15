@@ -28,8 +28,11 @@ touch the code.
 - **Fonts in the app:** Instrument Serif (regular and italic, no bold) for the
   app's own text; Arial for the names of events, deadlines and tasks. Korean
   comes from Apple SD Gothic Neo (iPhone) or Malgun Gothic (Windows).
-- **Text styles** in Figma still use Arimo (Arial's letter widths) and haven't
-  been switched to Instrument Serif yet.
+- **Text styles** match: the app's own text uses Instrument Serif (Title/Range
+  25, Title/Panel 22, Calendar/Date 20, Calendar/Weekday, Calendar/Hour label,
+  Event/Time, Body/Medium, Label, Caption, Section header, Badge). The item-name
+  styles (Event/Title, Chip, Body, Title/Dialog) use Arimo, which has Arial's
+  letter widths (Figma's connector can't use Arial itself).
 
 Not drawn in Figma yet: the agenda panel (right / bottom, and the phone's
 lower half), the 2-week timelines, the month view and Settings. Colors are
