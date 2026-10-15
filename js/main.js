@@ -289,15 +289,13 @@ function drawCalendar(r, rangeChanged, occs) {
     return;
   }
 
-  cal.innerHTML = renderTimeGrid({ days: r.days, occs: occs || occurrencesIn(r.from, r.to), tasks: tasksIn(r.from, r.to), labels: state.labels, settings });
+  // The whole day fits the space, so the timeline never scrolls up and down.
+  const headH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--head-h')) || 52;
+  cal.innerHTML = renderTimeGrid({
+    days: r.days, occs: occs || occurrencesIn(r.from, r.to), tasks: tasksIn(r.from, r.to), labels: state.labels, settings, fitHeight: cal.clientHeight, headH,
+  });
   const tg = cal.querySelector('.tg');
-  if (prev) tg.scrollTop = prev.top;
-  else if (!demo) {
-    // First time: bring the current time into view.
-    const n = nowMin();
-    const H0 = settings.dayStart * 60;
-    if (r.days.includes(today()) && n > H0) tg.scrollTop = Math.max(0, ((n - H0) * settings.hourHeight) / 60 - tg.clientHeight / 3);
-  }
+  if (prev && !tg.classList.contains('fit')) tg.scrollTop = prev.top;
   if (tg.scrollWidth > tg.clientWidth) {
     // Narrow screens scroll sideways: keep the place, or show the picked day.
     if (prev && !rangeChanged) tg.scrollLeft = prev.left;
@@ -725,7 +723,7 @@ function autoScroll(x, y, then) {
   const step = () => {
     scrollTimer = 0;
     const tg = $('.tg');
-    if (!tg || !onScroll) return;
+    if (!tg || !onScroll || tg.classList.contains('fit')) return;
     const [px, py] = lastPoint;
     const top = tg.querySelector('.tg-allday').getBoundingClientRect().bottom;
     const bottom = tg.getBoundingClientRect().bottom;
@@ -1182,11 +1180,9 @@ function wireEvents() {
     if (key === lastCal) return;
     lastCal = key;
     clearTimeout(calTimer);
-    calTimer = setTimeout(() => {
-      if (!store || sel || mv) return;
-      if (isGrid()) renderCalendar(viewRange(), false);
-      else fitText($('#cal'));
-    }, 60);
+    // The month grid and the day and week timelines fit their space, so
+    // they're redrawn when it changes.
+    calTimer = setTimeout(() => store && !sel && !mv && renderCalendar(viewRange(), false), 60);
   });
 
   // Keep "now" and "today" current.

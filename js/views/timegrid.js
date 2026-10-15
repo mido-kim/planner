@@ -17,6 +17,7 @@ import { barHtml, layoutBars } from './bars.js';
 // in the all-day row, across the days they cover.
 
 const MIN_PX = 20; // shortest an event block can be drawn, so it stays tappable
+const MIN_HOUR_PX = 8; // below this, a day too long for the screen scrolls after all
 const TASK_PX = 18; // height of a task chip
 const TAG_PX = 16; // height of a deadline's title tag
 const AD_ROW = 22; // all-day row: one bar plus the gap below it
@@ -173,25 +174,39 @@ function allDayStrip(days, cols, bars, { rowH, h24, color, cls }) {
 
 const byDoneThenCreated = (a, b) => a.done - b.done || (a.createdAt || 0) - (b.createdAt || 0);
 
-export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), settings }) {
+// `fitHeight`: the room for the whole view, in pixels. The day is then
+// squeezed to fit it, so nothing scrolls up and down; `headH` is the height
+// of the day headers. Without it, an hour is `settings.hourHeight` tall.
+export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), settings, fitHeight = 0, headH = 52 }) {
   const H0 = settings.dayStart * 60;
   const H1 = settings.dayEnd * 60;
-  const ppm = settings.hourHeight / 60;
-  const colH = (H1 - H0) * ppm;
   const h24 = settings.h24;
   const n = days.length;
   const t = today();
   const color = (item, fallback) => colorOf(item, labels, fallback);
-  const { cols, bars } = collect(days, occs, tasks, { H0, H1, scale: ppm, h24, color });
   const now = slotOf(t, nowMin(), H1);
 
   const heads = days.map((d) => dayHead(d, 'tg-dayhead', t, parts(d).d));
-  const strip = allDayStrip(days, cols, bars, { rowH: AD_ROW, h24, color, cls: 'tg-allday' });
+  const pre = collect(days, occs, tasks, { H0, H1, scale: 1, h24, color });
+  const strip = allDayStrip(days, pre.cols, pre.bars, { rowH: AD_ROW, h24, color, cls: 'tg-allday' });
+  let ppm = settings.hourHeight / 60;
+  let fit = false;
+  if (fitHeight) {
+    const fitted = (fitHeight - headH - strip.height - 1) / (H1 - H0);
+    if (fitted * 60 >= MIN_HOUR_PX) {
+      ppm = fitted;
+      fit = true;
+    }
+  }
+  const colH = (H1 - H0) * ppm;
+  // Short events stay tappable, but on a tightly squeezed day less so.
+  const minPx = Math.min(MIN_PX, Math.max(12, ppm * 30));
+  const { cols } = collect(days, occs, tasks, { H0, H1, scale: ppm, h24, color });
 
   const bodies = days.map((d) => {
     const { segs, marks, bottom, endLines } = cols.get(d);
-    layout(segs, MIN_PX / ppm);
-    const html = [workBand(d, settings, H0, H1, ppm, 'px'), ...segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev)))];
+    layout(segs, minPx / ppm);
+    const html = [workBand(d, settings, H0, H1, ppm, 'px'), ...segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev), minPx))];
     // Deadlines and timed tasks, top to bottom. A deadline's tag sits above its
     // line, or below it when there's no room; task chips that would overlap
     // move down.
@@ -230,11 +245,14 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
   });
 
   const labelsHtml = [];
-  for (let h = settings.dayStart; h < settings.dayEnd; h++) {
+  // With little room per hour, every other hour is labelled.
+  const step = ppm * 60 < 16 ? 2 : 1;
+  for (let h = settings.dayStart; h < settings.dayEnd; h += step) {
     labelsHtml.push(`<span${h >= 24 ? ' class="next"' : ''} style="top:${(h * 60 - H0) * ppm}px">${hourText(h, h24)}</span>`);
   }
 
-  return `<div class="tg n${n}" style="--hh:${settings.hourHeight}px">
+  const cls = ['tg', `n${n}`, fit && 'fit', ppm * 60 < 24 && 'tight'].filter(Boolean).join(' ');
+  return `<div class="${cls}" style="--hh:${ppm * 60}px">
     <div class="tg-grid" style="grid-template-columns:var(--axis-w) repeat(${n}, minmax(var(--col-min), 1fr))">
       <div class="tg-corner"></div>${heads.join('')}
       <div class="tg-adlabel" style="height:${strip.height}px">all-day</div>${strip.html}
@@ -363,11 +381,11 @@ function across(seg) {
   return `left:calc(${left}% + 1px);width:calc(${width}% - 3px);z-index:${1 + seg.col}`;
 }
 
-function eventBlock(seg, H0, ppm, h24, color) {
+function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX) {
   const { occ } = seg;
   const ev = occ.ev;
   const top = (seg.va - H0) * ppm;
-  const height = Math.max((seg.vb - seg.va) * ppm, MIN_PX);
+  const height = Math.max((seg.vb - seg.va) * ppm, minPx);
   const short = height < 36;
   const title = esc(ev.title || '(No title)');
   const time = fmtTimeRange(minOf(occ.start), minOf(occ.end), h24);

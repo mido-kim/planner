@@ -23,6 +23,9 @@ and setup, CHANGELOG.md for history.
 - `js/labels.js`: label colors, usage, retire and delete (as write ops).
 - `js/holidays.js`: Korean public holidays 2026–2031 (dates → names). Extend
   it each year; working-hours shading skips these days.
+- Day and week timelines fit their space (`fitHeight` in `renderTimeGrid`,
+  measured in main.js): no vertical scrolling; `settings.hourHeight` is only a
+  fallback when an hour would be under 8px.
 - The day can run past midnight (`settings.dayEnd` up to 28 = 4 AM):
   `slotOf` in timegrid.js puts the small hours in the previous day's column.
 - main.js has swipes (`wireSwipes`: day/week sideways via `move`, 2-week and

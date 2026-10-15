@@ -404,6 +404,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   -webkit-overflow-scrolling: touch;
 }
 .tg-grid { display: grid; min-width: 100%; }
+/* The day fits the screen: nothing scrolls up and down, and a swipe can't
+   nudge it either. */
+.tg.fit { overflow: hidden; touch-action: none; }
+.tw, .mv { touch-action: none; }
+/* Squeezed tight, only the hour lines are drawn. */
+.tg.tight .tg-col { background-image: linear-gradient(var(--line) 1px, transparent 1px); background-size: 100% var(--hh); }
 
 .tg-corner, .tg-dayhead {
   position: sticky;

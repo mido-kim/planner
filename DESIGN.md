@@ -117,7 +117,7 @@ dark-mode block.
 | View switcher | 30px segments, 7px corners inside a 9px-corner track |
 | Day header | 52px tall (48 phone); weekday 11px uppercase; date 17px semibold in a 28px circle (today filled) |
 | Hour column | 56px wide (42 phone); labels 10.5px |
-| Hour height | 30px (40, 52 and 68 in Settings) |
+| Hour height | Fits the screen: the hours shown (7 AM – 2 AM) share the height there is, so the timeline never scrolls (about 27px an hour on a PC, 15px in a phone's top half). Below 16px only every other hour is labelled and half-hour lines are left out. The Figma screens use 30px |
 | Grid lines | hour: 1px line color; half-hour: 1px softer line |
 | Event block | 6px corners, solid pastel fill with its dark ink for text (dark mode: 30% of the pastel, pastel text), no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
 | Tentative event | 30% of the pastel, 1.5px dashed outline |

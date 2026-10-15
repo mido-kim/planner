@@ -3,6 +3,14 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.3 (2026-10-15)
+
+- The Day and Week views now fit the whole day on the screen, so the timeline
+  no longer scrolls up and down (and a sideways swipe can't nudge it). How tall
+  an hour is follows the space there is; on a squeezed day only every other
+  hour is labelled. To give each hour more room, show fewer hours (Settings →
+  Day starts at / Day ends at). The Hour height setting is gone.
+
 ## 0.5.2 (2026-10-15)
 
 - Swipe to move through dates on a phone: left or right in the Day and Week

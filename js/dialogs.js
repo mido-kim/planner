@@ -2,7 +2,6 @@ import { absMin, addDays, dateOf, diffDays, dt, fmt, fromAbsMin, minOf, parseTim
 import { icons } from './icons.js';
 import { activeLabels, isRetired, retiredLabels, usageText } from './labels.js';
 import { describeRule, inLastWeekOfMonth, nthOf, ORDINALS, ruleKey, spanDays, WEEKDAYS, WEEKDAYS_SHORT } from './recurrence.js';
-import { HOUR_HEIGHTS } from './settings.js';
 import { COLORS, esc } from './util.js';
 import { VERSION } from './version.js';
 
@@ -778,7 +777,6 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
         ${fieldRow('Time format', '<select name="h24"><option value="0">12-hour (1:30 PM)</option><option value="1">24-hour (13:30)</option></select>')}
         ${fieldRow('Working hours', `<select name="workStart" aria-label="Working hours start">${hours(0, 23)}</select><span class="hint">to</span><select name="workEnd" aria-label="Working hours end">${hours(1, 24)}</select>`, 'work-row')}
         <label class="field-row toggle-row"><span class="lbl">Shade working hours <span class="hint">(weekdays that aren’t holidays)</span></span><input type="checkbox" name="showWork" class="switch"></label>
-        ${fieldRow('Hour height', `<select name="hourHeight">${HOUR_HEIGHTS.map((h, i) => `<option value="${h}">${h} px${i === 0 ? ' (compact, default)' : i === HOUR_HEIGHTS.length - 1 ? ' (large)' : ''}</option>`).join('')}</select>`)}
       </section>
       <section>
         <h3>Labels</h3>
@@ -813,7 +811,6 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
     f.elements.showWork.checked = !!settings.showWork;
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
-    f.elements.hourHeight.value = HOUR_HEIGHTS.includes(settings.hourHeight) ? settings.hourHeight : HOUR_HEIGHTS[0];
     const drawLabels = () => {
       const list = activeLabels(labels());
       f.querySelector('.label-preview').innerHTML = list.length
@@ -828,7 +825,6 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
         dayEnd: +f.elements.dayEnd.value,
         weekStart: +f.elements.weekStart.value,
         h24: f.elements.h24.value === '1',
-        hourHeight: +f.elements.hourHeight.value,
         workStart: +f.elements.workStart.value,
         workEnd: +f.elements.workEnd.value,
         showWork: f.elements.showWork.checked,

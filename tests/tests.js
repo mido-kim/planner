@@ -338,6 +338,15 @@ test('day end at 2 AM: shown as an early chip when the day before is not on scre
   if (!/chip[^"]*oor[^>]*data-id="night"/.test(html)) throw new Error('no early chip');
 });
 
+test('the day fits the space given: no scrolling up and down', () => {
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workStart: 10, workEnd: 21 };
+  // 600px of room, 52px of day headers, an empty 24px all-day row: 523px for 19 hours.
+  const html = renderTimeGrid({ days: ['2026-10-14'], occs: [], settings, fitHeight: 600, headH: 52 });
+  if (!html.includes('class="tg n1 fit') || !html.includes('class="tg-axis" style="height:523px"')) throw new Error('not fitted to 523px');
+  // Too little room for a usable hour: it scrolls at the usual hour height instead.
+  if (renderTimeGrid({ days: ['2026-10-14'], occs: [], settings, fitHeight: 150, headH: 52 }).includes(' fit')) throw new Error('should not squeeze below 8px an hour');
+});
+
 // ---- holidays and working hours
 test('holidays: substitutes, lunar dates in Korea time, 노동절 and 제헌절', () => {
   for (const d of ['2026-12-25', '2027-02-07', '2027-02-09', '2027-05-03', '2027-07-19', '2028-10-05', '2029-09-24', '2030-02-05', '2031-03-03']) {

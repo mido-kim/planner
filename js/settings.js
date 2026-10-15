@@ -8,7 +8,7 @@ export const DEFAULTS = {
   dayEnd: 26, // last hour shown; past 24 runs into the next morning (26 = 2 AM)
   weekStart: 0, // 0 = Sunday, 1 = Monday
   h24: false,
-  hourHeight: 30, // pixels per hour
+  hourHeight: 30, // pixels per hour, only when the day can't fit the screen
   view: 'week',
   // Working hours, shaded on weekdays that aren't public holidays.
   showWork: true,
@@ -24,8 +24,6 @@ export const DEFAULTS = {
   hideTasks: false, // hidden on a PC
   hideSplit: false, // hidden on a phone
 };
-
-export const HOUR_HEIGHTS = [30, 40, 52, 68];
 
 export function loadSettings() {
   const saved = readJSON(KEY, {});
