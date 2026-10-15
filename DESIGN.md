@@ -8,9 +8,15 @@ touch the code.
 
 **[Planner design](https://www.figma.com/design/52orOIzQZKKVSt9EeObl2X)**, in the MyTeam team.
 
-- **Screens page:** Phone · Week, PC · Week (with the task panel) and
-  Phone · Event editor, rebuilt from the real app as editable layers at 30px an
-  hour, plus a "Start here" note.
+- **Screens page** (copied from the app at 0.5.5 with the sample data, as
+  editable layers built from the components), plus a "Start here" note:
+  - Phones (393 × 852): Week (agenda below), 2 weeks, Month, Month with the
+    agenda sheet.
+  - PCs (1440 × 900): Week with the agenda on the right, Week with the agenda
+    at the bottom, 2 weeks, Month.
+  - Windows (phone): Event editor (with custom repeat), Deadline editor, Task
+    editor, Labels, Settings, Create menu.
+  - The 0.3 screens are kept on the "Old screens (0.3)" page.
 - **Components page:** every building block with its states: icons, Button,
   Icon button, Badge, View switcher, Day header, Switch, Weekday button, Color
   swatch, Text field, Select, Label pill, New buttons, Create menu, Event
@@ -34,10 +40,9 @@ touch the code.
   styles (Event/Title, Chip, Body, Title/Dialog) use Arimo, which has Arial's
   letter widths (Figma's connector can't use Arial itself).
 
-Not drawn in Figma yet: the agenda panel (right / bottom, and the phone's
-lower half), the 2-week timelines, the month view and Settings. Colors are
-up to date (the Gelato Days pastels). Ask
-Claude to add any screen you want to redesign.
+Not drawn in Figma yet: the day view, the scope dialog (this / following /
+all) and dark mode screens (the variables have Dark values, so a frame can
+be switched to Dark). Ask Claude to add any screen you want to redesign.
 
 ## The loop
 
@@ -85,9 +90,9 @@ Figma's free "Figma Design for beginners" course covers all of these.
   pickers can be built if you want full control (extra work).
 - **Fonts:** the app uses Arial, which every iPhone and PC has. Korean
   letters come from Apple SD Gothic Neo (iPhone) or Malgun Gothic (Windows).
-- **Hour height** comes from the app's Settings (30 px by default), not from
-  where a block sits in a frame: the Figma screens are drawn at 30 px an hour
-  to match.
+- **Hour height** isn't a setting any more: the day and week views share the
+  screen's height among the hours, so a block's size in a frame shows that
+  screen only.
 
 ## Name your layers
 
@@ -117,7 +122,7 @@ dark-mode block.
 | View switcher | 30px segments, 7px corners inside a 9px-corner track |
 | Day header | 52px tall (48 phone); weekday 11px uppercase; date 17px semibold in a 28px circle (today filled) |
 | Hour column | 56px wide (42 phone); labels 10.5px |
-| Hour height | Fits the screen: the hours shown (7 AM – 2 AM) share the height there is, so the timeline never scrolls (about 27px an hour on a PC, 15px in a phone's top half). Below 16px only every other hour is labelled and half-hour lines are left out. The Figma screens use 30px |
+| Hour height | Fits the screen: the hours shown (7 AM – 2 AM) share the height there is, so the timeline never scrolls (about 27px an hour on a PC, 15px in a phone's top half). Below 16px only every other hour is labelled and half-hour lines are left out. The Figma screens show the same |
 | Grid lines | hour: 1px line color; half-hour: 1px softer line |
 | Event block | 6px corners, solid pastel fill with its dark ink for text (dark mode: 30% of the pastel, pastel text), no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
 | Tentative event | 30% of the pastel, 1.5px dashed outline |

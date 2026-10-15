@@ -67,8 +67,8 @@ in the CSS yet. Figma gotchas met so far: SF Pro can't be used for instance
 text, and Arial isn't available to the Figma connector, so text styles use
 Arimo (Arial's metrics); paint opacity on variable-bound fills resets inside
 frames with explicit variable modes, so tints are separate layers with layer
-opacity. The screens were redrawn by script at 30px an hour; event positions
-there are set by hand, not from data.
+opacity. The screens were copied from the live app (?demo, 0.5.5) by script into
+instances of the components; event positions there are fixed, not from data.
 
 ## Data
 
