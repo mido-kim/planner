@@ -3,6 +3,19 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.6 (2026-10-17)
+
+- Task and deadline names are back on one line: a long name is cut and faded
+  at the end of its own day instead of running on over the next day or
+  wrapping (that put text on top of other events, especially on a phone). The
+  same in the month view.
+- Task and deadline names that would land on top of each other, or on an
+  event's title, now move a little up or down from their time until each one
+  is readable, also when both have a time (before, only those without a time
+  moved). Names never cover each other; in a very crowded spot (the 2-week
+  view on a phone) a name may still touch an event's title rather than move
+  hours away from its time.
+
 ## 0.5.5 (2026-10-15)
 
 - Tasks and deadlines have no background any more, on the calendar and in the

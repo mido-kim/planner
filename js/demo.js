@@ -53,6 +53,7 @@ export function demoStore(weekStart) {
     task('demo-t6', 'Pick up dry cleaning', day(2), { dueTime: '11:00', labelId: 'demo-l-personal' }),
     task('demo-t7', '학회 발표자료 만들기', day(3), { labelId: 'demo-l-research' }),
     task('demo-t8', 'Email the committee', day(3), { dueTime: '23:45', labelId: 'demo-l-teaching' }),
+    task('demo-t9', 'Proofread abstract', day(3), { dueTime: '16:30', labelId: 'demo-l-research' }),
   ];
 
   const data = {

@@ -30,9 +30,12 @@ and setup, CHANGELOG.md for history.
   `slotOf` in timegrid.js puts the small hours in the previous day's column.
 - main.js has swipes (`wireSwipes`: day/week sideways via `move`, 2-week and
   month by a week via `shiftWeek`; a swiped month keeps `state.monthGrid`).
-- main.js `arrangeLabels` runs after each calendar render: nudges no-time
-  tasks/deadlines clear of other labels, then lets long names spill into the
-  next day (`.spill`) or wrap (`.wrap`).
+- main.js `arrangeLabels` runs after each calendar render: moves task and
+  deadline names in a day up or down (`translateY`) until none overlap each
+  other or an event's text (the latter only within `NEAR_PX`), timed ones
+  first. Long names stay on one line inside their day (faded by
+  `fitText`); the user tried spilling into the next day and wrapping, and
+  turned both down.
 - main.js also has moving by drag (`beginMove` / `updateMove` / `endMove`,
   writes via `moveOps` in series.js) and `fitText`, which fades text that's
   cut off (`.fade` / `.fade-last`); the app never uses "…".

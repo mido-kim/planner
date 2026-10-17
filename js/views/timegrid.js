@@ -207,9 +207,7 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
   const minPx = Math.min(MIN_PX, Math.max(12, ppm * 30));
   const { cols } = collect(days, occs, tasks, { H0, H1, scale: ppm, h24, color });
 
-  // Columns stack left over right, so a task running on over the next day
-  // stays on top of it.
-  const bodies = days.map((d, i) => {
+  const bodies = days.map((d) => {
     const { segs, marks, bottom, endLines } = cols.get(d);
     layout(segs, minPx / ppm);
     const html = [workBand(d, settings, H0, H1, ppm, 'px'), ...segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev), minPx))];
@@ -244,7 +242,7 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
     });
     if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * ppm}px"></div>`);
     const cls = ['tg-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
-    return `<div class="${cls}" data-date="${d}" style="z-index:${n - i}">${html.join('')}</div>`;
+    return `<div class="${cls}" data-date="${d}">${html.join('')}</div>`;
   });
 
   const labelsHtml = [];
@@ -287,7 +285,7 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
     const heads = week.map((d) =>
       dayHead(d, 'tw-dayhead', t, parts(d).d === 1 || (w === 0 && d === week[0]) ? fmt(d, { month: 'short', day: 'numeric' }) : parts(d).d));
     const strip = allDayStrip(week, cols, bars, { rowH: MINI_AD_ROW, h24, color, cls: 'tw-allday' });
-    const bodies = week.map((d, i) => {
+    const bodies = week.map((d) => {
       const { segs, marks, bottom, endLines } = cols.get(d);
       layout(segs, 20);
       const html = [workBand(d, settings, H0, H1, pct, '%'), ...segs.map((seg) => miniBlock(seg, H0, pct, h24, color(seg.occ.ev)))];
@@ -309,7 +307,7 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
         html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:calc(${mid} + ${2 + k * MINI_TASK_PX}px)`)));
       if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * pct}%"></div>`);
       const cls = ['tw-col', d === t && 'today', isWeekend(d) && 'wkend'].filter(Boolean).join(' ');
-      return `<div class="${cls}" data-date="${d}" style="z-index:${7 - i}">${html.join('')}</div>`;
+      return `<div class="${cls}" data-date="${d}">${html.join('')}</div>`;
     });
     return `<div class="tw-week">
       <div class="tw-corner"></div>${heads.join('')}

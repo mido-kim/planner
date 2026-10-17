@@ -135,7 +135,7 @@ dark-mode block.
 | Deadline | 2px line across the day; title tag 16px tall, 10.5px bold white text on the color, 4px corners (square where it meets the line) |
 | Calendar task | 18px tall, no outline or background; a 10px round tick box (1.5px ring in the item's mid tone; done = filled with a white tick); title 11px bold in the item's ink |
 | Deadline tag | No background: flag in the mid tone and the name in the ink, 10.5px bold, sitting on its 2px line |
-| Long task / deadline names | Run on over the next day (up to two days wide) when that spot is free there; otherwise wrap onto more lines in their own day. Without a time they sit at midnight, nudged up or down clear of other names |
+| Long task / deadline names | One line, cut and faded at the end of their own day. Names that would overlap each other, or an event's title, move up or down from their time until they're clear (those with a time stay closest to it; an event's title is only stepped around within 32px). Without a time they sit at midnight |
 | Now line | 2px red, 10px dot |
 | Month cell | date 12.5px in a 24px circle; events 18px tall, 11.5px text; "+N more" |
 | Agenda panel | PC: 320px wide at the right (240–60% of the window, drag to resize) or 40% high at the bottom; phone: the lower 50% (20–80%), a sheet over the month view. Cards: 12px corners, 60% of the item's pastel, title 14px bold, time 12.5px in its ink, label and repeat 12px, notes 13px |

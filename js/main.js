@@ -247,63 +247,46 @@ function renderCalendar(r, rangeChanged, occs) {
   fitText($('#cal'));
 }
 
-// Task and deadline names, once drawn:
-// - In a day, one with only a date moves up or down until it's clear of the
-//   other task and deadline names there.
-// - A name too long for its day runs on over the next day when that spot is
-//   free there; otherwise it wraps onto more lines in its own day (or, in a
-//   month cell, is cut and faded). Days are done right to left, so each one
-//   knows where the next day's names ended up.
+// Task and deadline names in a day, once drawn: where one would overlap
+// another name, or the title or time written on an event, it moves up or down
+// from its time, as little as it can, until it's clear. Those with a time go
+// first, so they stay closest to it; those with only a date make room for
+// them. An event's text is only stepped around nearby (NEAR_PX); farther
+// than that, names just keep clear of each other. (A name too long for its
+// day stays on one line and fades; see fitText.)
+const NEAR_PX = 32;
 const labelBox = (el) => (el.classList.contains('dl') ? el.querySelector('.dl-tag') : el);
-const overlaps = (a, b) => a.top < b.bottom - 1 && b.top < a.bottom - 1;
+const overlaps = (a, b) => a.top < b.bottom - 1 && b.top < a.bottom - 1 && a.left < b.right - 1 && b.left < a.right - 1;
+const clipTo = (a, b) => ({ top: Math.max(a.top, b.top), bottom: Math.min(a.bottom, b.bottom), left: Math.max(a.left, b.left), right: Math.min(a.right, b.right) });
 
 function arrangeLabels(root) {
   if (!root) return;
-  const cols = [...root.querySelectorAll('.tg-col, .tw-col')];
-  for (const col of cols) {
-    const labels = [...col.querySelectorAll(':scope > .tchip, :scope > .dl')];
-    const fixed = labels.filter((el) => !el.matches('[data-notime], .day-end')).map((el) => labelBox(el).getBoundingClientRect());
+  for (const col of root.querySelectorAll('.tg-col, .tw-col')) {
     const c = col.getBoundingClientRect();
-    for (const el of labels.filter((x) => x.matches('.day-end')).concat(labels.filter((x) => x.matches('[data-notime]')))) {
-      const box = labelBox(el).getBoundingClientRect();
-      // Try 0, then a little further down and up in turn.
-      for (let i = 0; i <= 60; i++) {
-        const dy = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 4;
-        const moved = { top: box.top + dy, bottom: box.bottom + dy };
+    // The text on events, as far as it shows inside each block.
+    const words = [...col.querySelectorAll(':scope > .ev')].flatMap((ev) => {
+      const e = ev.getBoundingClientRect();
+      return [...ev.querySelectorAll('.ev-t, .ev-m')].map((t) => clipTo(t.getBoundingClientRect(), e))
+        .filter((r) => r.bottom - r.top > 1 && r.right - r.left > 1);
+    });
+    const labels = [...col.querySelectorAll(':scope > .tchip, :scope > .dl')]
+      .map((el) => ({ el, box: labelBox(el).getBoundingClientRect(), timed: !el.matches('[data-notime], .day-end') }))
+      .sort((a, b) => b.timed - a.timed || a.box.top - b.box.top);
+    const placed = [];
+    const clearSpot = (box, taken, reach) => {
+      // Where it is, then a little further down and up in turn.
+      for (let i = 0; i <= reach; i++) {
+        const dy = (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 2;
+        const moved = { top: box.top + dy, bottom: box.bottom + dy, left: box.left, right: box.right };
         if (moved.top < c.top || moved.bottom > c.bottom + 1) continue;
-        if (fixed.every((f) => !overlaps(moved, f))) {
-          if (dy) el.style.transform = `translateY(${dy}px)`;
-          fixed.push(moved);
-          break;
-        }
+        if (taken.every((t) => !overlaps(moved, t))) return [dy, moved];
       }
-    }
-  }
-  // Day and week views only spill within a row of days; the day view has none.
-  for (let i = cols.length - 2; i >= 0; i--) {
-    const next = cols[i + 1];
-    if (next.parentNode !== cols[i].parentNode) continue;
-    const taken = [...next.querySelectorAll(':scope > .tchip, :scope > .dl')].map((el) => labelBox(el).getBoundingClientRect());
-    for (const el of cols[i].querySelectorAll(':scope > .tchip, :scope > .dl')) {
-      const box = labelBox(el);
-      const text = box.querySelector('.tk-t, .ct');
-      if (!text || text.scrollWidth <= text.clientWidth + 1) continue;
-      const r = box.getBoundingClientRect();
-      el.classList.add(taken.some((t) => overlaps(r, t)) ? 'wrap' : 'spill');
-    }
-  }
-  for (const week of root.querySelectorAll('.mv-week')) {
-    const cells = [...week.querySelectorAll('.mv-cell')];
-    for (let i = cells.length - 2; i >= 0; i--) {
-      const n = cells[i + 1].getBoundingClientRect();
-      const others = [...week.querySelectorAll('.mchip, .bar, .mv-more')].map((x) => x.getBoundingClientRect())
-        .filter((x) => x.left < n.right && x.right > n.left);
-      for (const chip of cells[i].querySelectorAll('.mchip.mtask, .mchip.dline')) {
-        const text = chip.querySelector('.mtt');
-        if (!text || text.scrollWidth <= text.clientWidth + 1) continue;
-        const r = chip.getBoundingClientRect();
-        if (!others.some((o) => overlaps(r, o))) chip.classList.add('spill');
-      }
+      return null;
+    };
+    for (const { el, box } of labels) {
+      const [dy, spot] = clearSpot(box, placed.concat(words), NEAR_PX) || clearSpot(box, placed, 200) || [0, box];
+      if (dy) el.style.transform = `translateY(${dy}px)`;
+      placed.push(spot);
     }
   }
 }
