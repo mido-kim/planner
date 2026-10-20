@@ -31,7 +31,11 @@ and setup, CHANGELOG.md for history.
 - main.js has swipes (`wireSwipes`: day/week sideways via `move`, 2-week and
   month by a week via `shiftWeek`; a swiped month keeps `state.monthGrid`),
   and the mouse wheel does the same there (one step per `WHEEL_STEP_PX`, at
-  most one per `WHEEL_GAP_MS`).
+  most one per `WHEEL_GAP_MS`). `glide` animates the change with the Web
+  Animations API: the old panel (`.leaving`, clipped past the fixed hour
+  axis / weekday row) and the new one move together by `travel` (a page or
+  one week row); only `MOVERS` move; `SETTLE` is a spring as CSS `linear()`.
+  `settings.motion` 'fade' fades instead.
 - main.js `arrangeLabels` runs after each calendar render: moves task and
   deadline names in a day up or down (`translateY`) until none overlap each
   other or an event's text (the latter only within `NEAR_PX`), timed ones

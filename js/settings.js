@@ -26,6 +26,7 @@ export const DEFAULTS = {
   // 'system' (light or dark, as the device is set), 'light', 'dark', 'custom'
   // (made here and not saved: customTheme) or the id of a saved theme.
   theme: 'system',
+  motion: 'slide', // moving to other dates: 'slide' (glides and settles) or 'fade'
   customTheme: null, // { base, vars }
   themeCache: null, // { base, vars, css } of a made theme, for theme-boot.js
 };

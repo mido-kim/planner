@@ -396,6 +396,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   position: relative;
 }
 .cal {
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -405,18 +406,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 
 /* Moving to the next or previous dates: they slide in from that side. */
-@keyframes from-right { from { transform: translateX(30%); opacity: 0; } }
-@keyframes from-left { from { transform: translateX(-30%); opacity: 0; } }
-@keyframes from-below { from { transform: translateY(22%); opacity: 0; } }
-@keyframes from-above { from { transform: translateY(-22%); opacity: 0; } }
-.slide-left { animation: from-right 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.slide-right { animation: from-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.slide-up { animation: from-below 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.slide-down { animation: from-above 0.32s cubic-bezier(0.2, 0.8, 0.2, 1); }
-@keyframes fade-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .slide-left, .slide-right, .slide-up, .slide-down { animation: fade-in 0.22s ease-out; }
-}
+/* Gliding to other dates (main.js glide): the old dates lie over the new
+   ones while both move; nothing scrolls or takes a tap meanwhile. */
+.cal > .leaving { position: absolute; inset: 0; z-index: 30; overflow: hidden; pointer-events: none; }
+.cal > .gliding { overflow: hidden; }
 
 /* ------------------------------------------------------------------ Timeline (day / week / 2 weeks) */
 

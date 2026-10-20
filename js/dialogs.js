@@ -773,6 +773,7 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, onC
       <section>
         <h3>Appearance</h3>
         ${fieldRow('Theme', '<select name="theme"></select>')}
+        ${fieldRow('Moving between dates', '<select name="motion"><option value="slide">Slide and settle</option><option value="fade">Fade</option></select>')}
         <div class="btn-row">
           <button type="button" class="btn" data-act="makeTheme">${icons.palette}Make a theme…</button>
           <button type="button" class="btn" data-act="editTheme">Edit this theme…</button>
@@ -820,6 +821,7 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, onC
     f.elements.showWork.checked = !!settings.showWork;
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
+    f.elements.motion.value = settings.motion;
     // Light, Dark, System, this device's unsaved theme, and the saved ones.
     // Only made themes can be edited.
     const editable = () => (f.querySelector('[data-act=editTheme]').hidden = ['system', 'light', 'dark'].includes(f.elements.theme.value));
@@ -845,6 +847,7 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, onC
       if (e.target.name === 'restoreFile') return;
       onChange({
         theme: f.elements.theme.value,
+        motion: f.elements.motion.value,
         dayStart: +f.elements.dayStart.value,
         dayEnd: +f.elements.dayEnd.value,
         weekStart: +f.elements.weekStart.value,

@@ -3,6 +3,19 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.6.2 (2026-10-20)
+
+- Moving to other dates glides like scrolling a page: the old dates move out
+  while the new ones come in right behind them and settle into place with a
+  soft spring, instead of fading in. In the day and week views the hour
+  labels stay put while the days slide sideways; in the month view the
+  weekday row stays put and a week up or down moves by exactly one row. The
+  same for the wheel, the arrow buttons and keys, and swipes (the days follow
+  your finger and carry on from where you let go).
+- Settings → Appearance → Moving between dates: Slide and settle, or Fade.
+  It slides even when the device asks apps for less motion (Windows with
+  animation effects off does); pick Fade for the calmer one.
+
 ## 0.6.1 (2026-10-20)
 
 - The agenda only shows what's still ahead: events that are over (earlier

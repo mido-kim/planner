@@ -588,8 +588,10 @@ async function openThemeMaker(edit) {
 
 // ---------------------------------------------------------------- Navigation
 
-function move(dir) {
+// `from`: how far a swipe has already dragged the dates, in pixels.
+function move(dir, from = 0) {
   const v = state.view;
+  const old = takePanel();
   // A month view swiped by weeks moves on from the month it shows.
   const base = v === 'month' && state.monthGrid ? viewRange().from : state.date;
   state.monthGrid = null;
@@ -598,24 +600,92 @@ function move(dir) {
       : v === '2week' ? addDays(base, 14 * dir)
         : addMonths(base, dir);
   render();
-  slide(v === 'month' || v === '2week' ? (dir > 0 ? 'up' : 'down') : dir > 0 ? 'left' : 'right');
+  glide(old, v === 'month' || v === '2week' ? 'y' : 'x', dir, 'page', from);
 }
 
 // The 2-week and month views move a week at a time when swiped.
-function shiftWeek(dir) {
+function shiftWeek(dir, from = 0) {
+  const old = takePanel();
   if (state.view === 'month') {
     const r = viewRange();
     state.monthGrid = { from: addDays(r.gridFrom, 7 * dir), weeks: r.weeks };
   }
   state.date = addDays(state.date, 7 * dir);
   render();
-  slide(dir > 0 ? 'up' : 'down');
+  glide(old, 'y', dir, 'week', from);
 }
 
-// The new dates slide in from the side they came from (fade in, with Reduce
-// Motion on).
-function slide(dir) {
-  $('#cal')?.firstElementChild?.classList.add(`slide-${dir}`);
+// ---------------------------------------------------------------- Gliding between dates
+
+// The calendar moves like one long strip: the old dates go out one way while
+// the new ones come in right behind them, and settle into place with a little
+// spring. The hour labels and the month's weekday row stay where they are; a
+// week up or down in the month view moves by exactly one row, so the weeks
+// still on screen just glide up.
+const MOVERS = '.tg-grid > :not(.tg-corner, .tg-adlabel, .tg-axis), .mv-week, .tw-week';
+const GLIDE_MS = 520;
+const SETTLE = springEasing(0.86, GLIDE_MS);
+
+// A spring as a CSS easing: `damping` 1 settles without overshooting, a bit
+// less overshoots a hair first. Older browsers get a plain ease-out.
+function springEasing(damping, ms) {
+  if (!CSS.supports?.('transition-timing-function', 'linear(0, 1)')) return 'cubic-bezier(0.2, 0.9, 0.25, 1)';
+  const w = 6.9 / (damping * (ms / 1000)); // settled to 0.1% by the end
+  const wd = w * Math.sqrt(1 - damping * damping);
+  const at = (t) => 1 - Math.exp(-damping * w * t) * (Math.cos(wd * t) + ((damping * w) / wd) * Math.sin(wd * t));
+  const steps = 40;
+  const pts = Array.from({ length: steps + 1 }, (_, i) => (i === steps ? 1 : +at((i / steps) * (ms / 1000)).toFixed(4)));
+  return `linear(${pts.join(', ')})`;
+}
+
+// The dates on screen, to glide out of the way once new ones are drawn. A
+// glide still running is finished first.
+function takePanel() {
+  const cal = $('#cal');
+  if (!cal) return null;
+  cal.getAnimations({ subtree: true }).forEach((a) => a.finish());
+  cal.querySelectorAll('.leaving').forEach((el) => el.remove());
+  return cal.firstElementChild;
+}
+
+// How far the dates move: a page (all the days, or the whole month or two
+// weeks) or one week row.
+function travel(panel, axis, unit) {
+  if (axis === 'x') return panel.clientWidth - (panel.querySelector('.tg-axis')?.offsetWidth || 0);
+  const rows = panel.querySelectorAll('.mv-week, .tw-week');
+  if (unit === 'week' && rows.length > 1) return rows[1].offsetTop - rows[0].offsetTop;
+  return rows.length ? rows[rows.length - 1].offsetTop + rows[rows.length - 1].offsetHeight - rows[0].offsetTop : panel.clientHeight;
+}
+
+function glide(old, axis, dir, unit, from = 0) {
+  const cal = $('#cal');
+  const panel = cal?.firstElementChild;
+  if (!old || !panel || old === panel) return;
+  if (settings.motion === 'fade') {
+    panel.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
+    return;
+  }
+  const dist = travel(panel, axis, unit);
+  // The old dates lie over the new ones, cut short where the hour labels or
+  // the weekday row are.
+  const fixed = panel.querySelector(axis === 'x' ? '.tg-axis' : '.mv-head');
+  old.style.clipPath = axis === 'x' ? `inset(0 0 0 ${fixed?.offsetWidth || 0}px)` : `inset(${fixed?.offsetHeight || 0}px 0 0 0)`;
+  old.classList.add('leaving');
+  panel.classList.add('gliding');
+  cal.append(old);
+  const at = (v) => ({ transform: `translate${axis.toUpperCase()}(${v}px)` });
+  const opts = { duration: GLIDE_MS, easing: SETTLE };
+  const runs = [
+    // Both move by the same amount, so they stay joined.
+    ...[...old.querySelectorAll(MOVERS)].map((el) => el.animate([at(from), at(-dir * dist)], { ...opts, fill: 'forwards' })),
+    ...[...panel.querySelectorAll(MOVERS)].map((el) => el.animate([at(from + dir * dist), at(0)], opts)),
+  ];
+  Promise.allSettled(runs.map((a) => a.finished)).then(() => {
+    old.remove();
+    panel.classList.remove('gliding');
+  });
+  // In case the page isn't drawing (a hidden tab), it still ends up in place.
+  setTimeout(() => runs.forEach((a) => a.finish()), GLIDE_MS + 250);
 }
 
 // Going straight to a date shows its whole month again.
@@ -1095,32 +1165,25 @@ function wireMoves() {
 // move, still work as before.
 let gestureUsed = false; // the touch became a selection or a move
 
-// The calendar follows the finger while swiping; let go past a quarter of the
-// way (or with a quick flick) and it carries on out while the next dates
-// slide in, otherwise it springs back.
-const EASE_OUT = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
-const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-
+// The dates follow the finger while swiping (the hour labels and weekday row
+// stay put); let go past a quarter of the way (or with a quick flick) and
+// they glide on to the next dates, otherwise they spring back.
 function wireSwipes() {
   let sw = null;
-  let busy = false; // a swipe is still finishing its animation
-  const reset = (el) => {
-    el.style.transition = '';
-    el.style.transform = '';
-    el.style.opacity = '';
-  };
+  const drag = (s, d) => s.movers.forEach((el) => (el.style.transform = d ? `translate${s.axis.toUpperCase()}(${d}px)` : ''));
   const springBack = (s) => {
-    s.el.style.transition = `transform 0.3s ${EASE_OUT}`;
-    s.el.style.transform = '';
-    setTimeout(() => s.el.isConnected && reset(s.el), 320);
+    const at = (v) => ({ transform: `translate${s.axis.toUpperCase()}(${v}px)` });
+    const runs = s.movers.map((el) => el.animate([at(s.d), at(0)], { duration: 360, easing: SETTLE }));
+    drag(s, 0);
+    Promise.allSettled(runs.map((a) => a.finished)).then(() => s.panel.classList.remove('gliding'));
   };
   app.addEventListener('touchstart', (e) => {
     sw = null;
     gestureUsed = false;
-    if (busy || e.touches.length !== 1 || !e.target.closest('#cal')) return;
+    if (e.touches.length !== 1 || !e.target.closest('#cal')) return;
     const t = e.touches[0];
     const axis = state.view === 'day' || state.view === 'week' ? 'x' : 'y';
-    sw = { x: t.clientX, y: t.clientY, t: Date.now(), d: 0, axis, on: false, el: $('#cal').firstElementChild };
+    sw = { x: t.clientX, y: t.clientY, t: Date.now(), d: 0, axis, on: false };
   }, { passive: true });
   app.addEventListener('touchmove', (e) => {
     if (!sw) return;
@@ -1139,31 +1202,24 @@ function wireSwipes() {
         return;
       }
       sw.on = true;
-      sw.el.style.transition = 'none';
-      sw.el.style.willChange = 'transform';
+      sw.panel = takePanel();
+      sw.movers = [...sw.panel.querySelectorAll(MOVERS)];
+      sw.panel.classList.add('gliding');
     }
     sw.d = sw.axis === 'x' ? dx : dy;
-    sw.el.style.transform = `translate${sw.axis.toUpperCase()}(${sw.d}px)`;
+    drag(sw, sw.d);
   }, { passive: true });
   app.addEventListener('touchend', () => {
     const s = sw;
     sw = null;
     if (!s?.on) return;
-    const size = s.axis === 'x' ? s.el.clientWidth : s.el.clientHeight;
+    if (!s.panel.isConnected) return; // redrawn meanwhile
+    const size = travel(s.panel, s.axis, s.axis === 'x' ? 'page' : 'week');
     const speed = Math.abs(s.d) / Math.max(1, Date.now() - s.t); // px per ms
     if (Math.abs(s.d) < size * 0.25 && !(speed > 0.4 && Math.abs(s.d) > 30)) return springBack(s);
     const dir = s.d < 0 ? 1 : -1;
-    const go = () => (s.axis === 'x' ? move(dir) : shiftWeek(dir));
-    // With Reduce Motion on, the old dates fade out where they are instead.
-    const still = reducedMotion();
-    busy = true;
-    s.el.style.transition = still ? 'opacity 0.12s ease-in' : 'transform 0.14s ease-in, opacity 0.14s ease-in';
-    if (!still) s.el.style.transform = `translate${s.axis.toUpperCase()}(${-dir * size * 0.45}px)`;
-    s.el.style.opacity = '0';
-    setTimeout(() => {
-      busy = false;
-      go();
-    }, still ? 120 : 140);
+    if (s.axis === 'x') move(dir, s.d);
+    else shiftWeek(dir, s.d);
   });
   app.addEventListener('touchcancel', () => {
     if (sw?.on) springBack(sw);
