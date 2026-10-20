@@ -1,86 +1,97 @@
 import { COLORS } from './util.js';
 
-// Themes: the built-in Light and Dark (css/app.css, picked by data-theme on
-// <html>), and themes you make in the theme maker. A theme you make is
-// { id, name, base: 'light' | 'dark', vars, createdAt, updatedAt }, where
-// `vars` has a color ('#rrggbb') for each part below and a percent for each
-// amount. Saved themes are kept with your data, so they sync; which theme a
-// device shows is one of its display settings.
+// Themes: the app's own Light and Dark (css/app.css, picked by data-theme on
+// <html>), seven more made from well-loved color palettes (PRESETS), and any
+// saved in the data by an earlier version's theme maker. A theme other than
+// Light and Dark is { base: 'light' | 'dark', vars }, where `vars` has a
+// color ('#rrggbb') for each CSS variable in KEYS and a percent for `fill`,
+// `today-tint` and `work`; they go on <html> over the base's own. Which theme
+// a device shows is one of its display settings.
 
-const cap = (s) => s[0].toUpperCase() + s.slice(1);
-
-// [group, [[css variable, name], …]]
-export const PARTS = [
-  ['Surfaces', [['bg', 'Background'], ['bg-2', 'Panels and weekends'], ['bg-3', 'Buttons and tracks'], ['line', 'Lines']]],
-  ['Text', [['fg', 'Text'], ['fg-2', 'Secondary text'], ['fg-3', 'Faint text'], ['danger', 'Overdue and delete']]],
-  ['Accent', [['accent', 'Accent (buttons, today)'], ['accent-fg', 'Text on the accent'], ['accent-strong', 'Switches and focus'], ['accent-ink', 'Links and accent text'], ['now', 'Now line']]],
-  ['Item colors', COLORS.flatMap((c) => [[`c-${c}`, `${cap(c)}`], [`ink-${c}`, `${cap(c)} text`]])],
+export const KEYS = [
+  'bg', 'bg-2', 'bg-3', 'line', 'fg', 'fg-2', 'fg-3', 'danger',
+  'accent', 'accent-fg', 'accent-strong', 'accent-ink', 'now',
+  ...COLORS.flatMap((c) => [`c-${c}`, `ink-${c}`]),
 ];
-// [css variable, name, min, max] in percent
-export const AMOUNTS = [['fill', 'Item fill strength', 0, 100], ['today-tint', 'Today highlight', 0, 40], ['work', 'Working hours shade', 0, 12]];
-const KEYS = PARTS.flatMap(([, parts]) => parts.map(([k]) => k));
 
 // ---------------------------------------------------------------- Colors
 
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
-// '#rgb', '#rrggbb' or 'rgb(a)(…)' → '#rrggbb'
-export function toHex(css) {
-  const s = String(css).trim();
-  let m = s.match(/^#([0-9a-f]{3})$/i);
-  if (m) return `#${[...m[1]].map((c) => c + c).join('')}`.toLowerCase();
-  if (/^#[0-9a-f]{6}$/i.test(s)) return s.toLowerCase();
-  m = s.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
-  if (m) return `#${m.slice(1, 4).map((v) => Math.round(+v).toString(16).padStart(2, '0')).join('')}`;
-  return '#000000';
+// `a` moved `t` of the way to `b` (both '#rrggbb').
+export function mix(a, b, t) {
+  const [x, y] = [rgb(a), rgb(b)];
+  return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
 }
 
-// '#rrggbb' → { h: 0–360, s: 0–100, l: 0–100 }
-export function hexToHsl(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  const d = max - min;
-  if (!d) return { h: 0, s: 0, l: l * 100 };
-  const s = d / (1 - Math.abs(2 * l - 1));
-  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return { h: (h * 60 + 360) % 360, s: s * 100, l: l * 100 };
+// ---------------------------------------------------------------- Presets
+
+// A preset from its palette: the surfaces and text, an accent color, and one
+// palette color for each item color. On a light theme an item's fill is a
+// pale tint of its color and its text a deep shade of it; on a dark one the
+// color itself is both (as in Dark).
+function preset(id, name, base, p) {
+  const light = base === 'light';
+  const accent = light
+    ? { accent: mix(p.accent, '#ffffff', 0.7), 'accent-fg': mix(p.accent, '#000000', 0.55), 'accent-strong': mix(p.accent, '#ffffff', 0.25), 'accent-ink': p.accent }
+    : { accent: p.accent, 'accent-fg': p.bg, 'accent-strong': p.accent, 'accent-ink': p.accent };
+  const items = Object.fromEntries(COLORS.flatMap((c) => {
+    const col = p.items[c];
+    return light ? [[`c-${c}`, mix(col, '#ffffff', 0.68)], [`ink-${c}`, mix(col, '#000000', 0.35)]] : [[`c-${c}`, col], [`ink-${c}`, col]];
+  }));
+  const vars = {
+    bg: p.bg, 'bg-2': p.bg2, 'bg-3': p.bg3, line: p.line, fg: p.fg, 'fg-2': p.fg2, 'fg-3': p.fg3,
+    danger: p.danger, now: p.now, ...accent, ...items,
+    fill: light ? 100 : 30, 'today-tint': light ? 14 : 8, work: light ? 4 : 3,
+  };
+  return { id, name, base, vars };
 }
 
-export function hslToHex({ h, s, l }) {
-  const S = clamp(s, 0, 100) / 100;
-  const L = clamp(l, 0, 100) / 100;
-  const k = (n) => (n + h / 30) % 12;
-  const a = S * Math.min(L, 1 - L);
-  const f = (n) => L - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-  return `#${[0, 8, 4].map((n) => Math.round(f(n) * 255).toString(16).padStart(2, '0')).join('')}`;
-}
+const ITEMS = (blue, teal, green, yellow, orange, red, pink, purple, gray) => ({ blue, teal, green, yellow, orange, red, pink, purple, gray });
 
-// A dark background makes a dark theme: native controls (date pickers,
-// scrollbars) and shadows follow it.
-export const baseOf = (vars) => (hexToHsl(vars.bg).l < 50 ? 'dark' : 'light');
+// Palettes: Catppuccin (catppuccin.com), Rosé Pine (rosepinetheme.com), Nord
+// (nordtheme.com), Everforest and Tokyo Night. Where a palette has no color
+// for one of the nine, a neighbor is mixed in.
+export const PRESETS = [
+  preset('preset-latte', 'Latte', 'light', {
+    bg: '#eff1f5', bg2: '#e6e9ef', bg3: '#dce0e8', line: '#ccd0da', fg: '#4c4f69', fg2: '#6c6f85', fg3: '#9ca0b0',
+    danger: '#d20f39', now: '#e64553', accent: '#8839ef',
+    items: ITEMS('#1e66f5', '#179299', '#40a02b', '#df8e1d', '#fe640b', '#d20f39', '#ea76cb', '#8839ef', '#8c8fa1'),
+  }),
+  preset('preset-dawn', 'Rosé Dawn', 'light', {
+    bg: '#fffaf3', bg2: '#faf4ed', bg3: '#f2e9e1', line: '#dfdad9', fg: '#575279', fg2: '#797593', fg3: '#9893a5',
+    danger: '#b4637a', now: '#b4637a', accent: '#d7827e',
+    items: ITEMS('#286983', '#56949f', '#6d8f5e', '#ea9d34', mix('#ea9d34', '#d7827e', 0.5), '#b4637a', '#d7827e', '#907aa9', '#9893a5'),
+  }),
+  preset('preset-nord-light', 'Nord Snow', 'light', {
+    bg: '#eceff4', bg2: '#e5e9f0', bg3: '#d8dee9', line: '#d0d7e2', fg: '#2e3440', fg2: '#4c566a', fg3: '#7b8394',
+    danger: '#bf616a', now: '#bf616a', accent: '#5e81ac',
+    items: ITEMS('#5e81ac', '#8fbcbb', '#a3be8c', '#ebcb8b', '#d08770', '#bf616a', mix('#b48ead', '#bf616a', 0.4), '#b48ead', '#4c566a'),
+  }),
+  preset('preset-mocha', 'Mocha', 'dark', {
+    bg: '#1e1e2e', bg2: '#181825', bg3: '#313244', line: '#2a2b3c', fg: '#cdd6f4', fg2: '#a6adc8', fg3: '#6c7086',
+    danger: '#f38ba8', now: '#f38ba8', accent: '#cba6f7',
+    items: ITEMS('#89b4fa', '#94e2d5', '#a6e3a1', '#f9e2af', '#fab387', '#f38ba8', '#f5c2e7', '#cba6f7', '#9399b2'),
+  }),
+  preset('preset-rose-pine', 'Rosé Pine', 'dark', {
+    bg: '#191724', bg2: '#1f1d2e', bg3: '#26233a', line: '#2a2739', fg: '#e0def4', fg2: '#908caa', fg3: '#6e6a86',
+    danger: '#eb6f92', now: '#eb6f92', accent: '#ebbcba',
+    items: ITEMS('#9ccfd8', mix('#31748f', '#9ccfd8', 0.5), '#b5c99a', '#f6c177', mix('#f6c177', '#eb6f92', 0.45), '#eb6f92', '#ebbcba', '#c4a7e7', '#908caa'),
+  }),
+  preset('preset-everforest', 'Everforest', 'dark', {
+    bg: '#2d353b', bg2: '#343f44', bg3: '#3d484d', line: '#414b50', fg: '#d3c6aa', fg2: '#9da9a0', fg3: '#7a8478',
+    danger: '#e67e80', now: '#e69875', accent: '#a7c080',
+    items: ITEMS('#7fbbb3', '#83c092', '#a7c080', '#dbbc7f', '#e69875', '#e67e80', mix('#d699b6', '#ffffff', 0.25), '#d699b6', '#9da9a0'),
+  }),
+  preset('preset-tokyo', 'Tokyo Night', 'dark', {
+    bg: '#1a1b26', bg2: '#16161e', bg3: '#292e42', line: '#24283b', fg: '#c0caf5', fg2: '#a9b1d6', fg3: '#565f89',
+    danger: '#f7768e', now: '#ff9e64', accent: '#7aa2f7',
+    items: ITEMS('#7aa2f7', '#73daca', '#9ece6a', '#e0af68', '#ff9e64', '#f7768e', mix('#bb9af7', '#f7768e', 0.5), '#bb9af7', '#a9b1d6'),
+  }),
+];
+export const presetOf = (id) => PRESETS.find((p) => p.id === id) || null;
 
 // ---------------------------------------------------------------- Applying
-
-// The colors of the built-in Light or Dark theme, as a starting point.
-export function builtIn(base) {
-  const root = document.documentElement;
-  const style = root.getAttribute('style');
-  const was = root.dataset.theme;
-  root.removeAttribute('style');
-  root.dataset.theme = base;
-  const cs = getComputedStyle(root);
-  const read = (k) => cs.getPropertyValue(`--${k}`).trim();
-  const vars = Object.fromEntries(KEYS.map((k) => [k, toHex(read(k))]));
-  vars.fill = parseFloat(read('fill'));
-  vars['today-tint'] = parseFloat(read('today-tint'));
-  vars.work = Math.round(parseFloat(read('work').split(',')[3] || '0.04') * 1000) / 10;
-  if (was) root.dataset.theme = was;
-  else delete root.dataset.theme;
-  if (style !== null) root.setAttribute('style', style);
-  return vars;
-}
 
 // The CSS variables a theme sets on <html>. The hover, soft and line tones are
 // mixed from its colors.

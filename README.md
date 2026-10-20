@@ -27,11 +27,9 @@ an app on a PC (Chrome) and an iPhone (Safari).
   calendar, with a tick box.
 - **Gelato colors:** soft pastel colors throughout, in light and dark mode.
 - **Themes** (Settings → Appearance): System (light or dark as the device is
-  set), Light, Dark, or one you make. The theme maker has hue, saturation and
-  lightness sliders for every part (background, panels, lines, text, accent,
-  each item color and its text) and shows the change as you slide. Name a
-  theme to save it to your account for all your devices; each device picks
-  its own.
+  set), Light, Dark, and seven made from well-loved color palettes: Latte,
+  Rosé Dawn and Nord Snow (light); Mocha, Rosé Pine, Everforest and Tokyo
+  Night (dark). Each device picks its own.
 - **Drag to move** events, deadlines and tasks to another time or day.
 - **Check off** tasks (tick box), deadlines (the flag) and events (the little
   symbol in front of the name: a check box, or a heart, star, book, beaker…
@@ -42,7 +40,8 @@ an app on a PC (Chrome) and an iPhone (Safari).
   the calendar: tilt it (or hold Shift) for days and weeks, roll it for the
   2-week and month views.
 - **Korean public holidays** (2026–2031) built in; working hours are lightly
-  shaded on the other weekdays.
+  shaded on the other weekdays. Working hours can be several stretches of the
+  day (Settings → Calendar), 10 AM–12 PM, 1–6 PM and 7–9 PM to start with.
 - **Works offline.** Optional sync between devices through Firebase.
 - **Your data stays portable:** JSON backups that restore into this app, and
   `.ics` export that opens in Google Calendar, Apple Calendar and Outlook.
@@ -154,13 +153,13 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 | File | What it does |
 |---|---|
 | `index.html`, `css/app.css` | Page and styles (light and dark) |
-| `js/themes.js`, `js/theme-boot.js` | Themes: built-in and made ones, applied before the page shows |
+| `js/themes.js`, `js/theme-boot.js` | Themes: Light, Dark and the palette themes, applied before the page shows |
 | `js/main.js` | App startup, layout, navigation and input |
 | `js/views/timegrid.js` | Day / week timeline and the 2-week view |
 | `js/views/month.js` | Month grid |
 | `js/views/agenda.js` | Agenda (events, deadlines and tasks with details) |
 | `js/holidays.js` | Korean public holidays, 2026–2031 |
-| `js/dialogs.js` | Event, task, repeat-scope, settings and theme maker dialogs |
+| `js/dialogs.js` | Event, task, repeat-scope, labels and settings dialogs |
 | `js/recurrence.js` | Repeat rules: occurrence dates, descriptions, iCalendar RRULE |
 | `js/series.js` | "This / this and following / all" edits and deletes |
 | `js/store.js` | Local storage, and the interface any storage must provide |

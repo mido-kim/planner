@@ -47,7 +47,7 @@ and setup, CHANGELOG.md for history.
   cut off (`.fade` / `.fade-last`); the app never uses "…".
 - `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
   label picker, symbol picker), scope dialog, task editor, labels manager,
-  create menu, settings, theme maker.
+  create menu, settings (with the working hours list).
 - `js/symbols.js`: the check-off symbols (outline → filled; parts `s` / `d` /
   `k` in each SVG, styled in css under `.sym`), `symbolOf` (event's own, its
   label's, else 'check'; deadlines 'flag'), `isDone`, `doneOps`,
@@ -72,13 +72,18 @@ and setup, CHANGELOG.md for history.
   stack; `--font-item` (item names, selector list under "Base") is the same
   for now. main.js re-renders on `document.fonts` `loadingdone`, since the
   Korean font only loads once Korean text shows.
-- Themes: `js/themes.js` (parts, color math, `builtIn` reads Light/Dark from
-  the CSS, `cssVars`, `applyTheme`), `js/theme-boot.js` (classic script in
-  `<head>`: sets `data-theme` / the cached variables before first paint).
-  `css/app.css` has Light on `:root` and Dark on `:root[data-theme="dark"]`;
-  never use `prefers-color-scheme` in CSS. main.js `showTheme` /
-  `chosenTheme` / `openThemeMaker`; `settings.theme` is per device ('system',
-  'light', 'dark', 'custom' or a saved theme id).
+- Themes: `js/themes.js` (`PRESETS`: seven palette themes built by `preset`
+  from a palette's surfaces, accent and nine item colors; `cssVars`,
+  `applyTheme`), `js/theme-boot.js` (classic script in `<head>`: sets
+  `data-theme` / the cached variables before first paint). `css/app.css` has
+  Light on `:root` and Dark on `:root[data-theme="dark"]`; never use
+  `prefers-color-scheme` in CSS. main.js `showTheme` / `chosenTheme`;
+  `settings.theme` is per device ('system', 'light', 'dark', a preset id, or
+  'custom' / a saved theme id from the theme maker that 0.8.0 removed). The
+  user loves Light and Dark as they are: don't change them.
+- Working hours: `settings.workRanges` ([from, to] hours, any number);
+  `workSpans` in settings.js sorts and joins them, timegrid.js `workBand`
+  shades each.
 - `sw.js`: offline cache. **Add any new file to `SHELL`.**
 - `js/demo.js`: design preview (`?demo`), in-memory sample data. DESIGN.md has
   the Figma workflow, layer names and the URL options.
@@ -115,7 +120,8 @@ updatedAt }`.
 
 Theme: `{ id, name, base: 'light' | 'dark', vars, createdAt, updatedAt }`;
 `vars` maps each part's CSS variable name (without `--`) to '#rrggbb', plus
-`fill`, `today-tint`, `work` in percent (see `PARTS` / `AMOUNTS`).
+`fill`, `today-tint`, `work` in percent (see `KEYS` and `preset` in themes.js).
+Saved themes come only from the old theme maker; they still show and sync.
 An item's `color` is null when it follows its label (`colorOf` in labels.js).
 Missing fields mean their default (older data has none of the new ones).
 

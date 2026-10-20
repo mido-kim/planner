@@ -7,7 +7,8 @@ import { HOLIDAYS } from '../js/holidays.js';
 import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
 import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
-import { baseOf, cssVars, hexToHsl, hslToHex, toHex } from '../js/themes.js';
+import { cssVars, KEYS, mix, PRESETS } from '../js/themes.js';
+import { DEFAULTS, workSpans } from '../js/settings.js';
 import { doneOps, isDone, symbolOf } from '../js/symbols.js';
 
 const results = [];
@@ -334,7 +335,7 @@ test('day end at 2 AM: the small hours belong to the day before', () => {
 });
 test('day end at 2 AM: a 12:30 AM event sits at the bottom of the day before', () => {
   const late = ev({ id: 'night', start: '2026-10-15T00:30', end: '2026-10-15T01:30' });
-  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workStart: 10, workEnd: 21 };
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workRanges: [[10, 21]] };
   const html = renderTimeGrid({ days: ['2026-10-14', '2026-10-15'], occs: expand(late, '2026-10-14', '2026-10-16'), settings });
   const cols = html.split('class="tg-col').slice(1);
   if (!cols[0].includes('data-id="night"') || !cols[0].includes('top:525px')) throw new Error('not at 12:30 AM in the first column');
@@ -342,13 +343,13 @@ test('day end at 2 AM: a 12:30 AM event sits at the bottom of the day before', (
 });
 test('day end at 2 AM: shown as an early chip when the day before is not on screen', () => {
   const late = ev({ id: 'night', start: '2026-10-15T00:30', end: '2026-10-15T01:30' });
-  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workStart: 10, workEnd: 21 };
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workRanges: [[10, 21]] };
   const html = renderTimeGrid({ days: ['2026-10-15'], occs: expand(late, '2026-10-15', '2026-10-16'), settings });
   if (!/chip[^"]*oor[^>]*data-id="night"/.test(html)) throw new Error('no early chip');
 });
 
 test('the day fits the space given: no scrolling up and down', () => {
-  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workStart: 10, workEnd: 21 };
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: false, workRanges: [[10, 21]] };
   // 600px of room, 52px of day headers, an empty 24px all-day row: 523px for 19 hours.
   const html = renderTimeGrid({ days: ['2026-10-14'], occs: [], settings, fitHeight: 600, headH: 52 });
   if (!html.includes('class="tg n1 fit') || !html.includes('class="tg-axis" style="height:523px"')) throw new Error('not fitted to 523px');
@@ -370,11 +371,21 @@ test('holidays: substitutes, lunar dates in Korea time, 노동절 and 제헌절'
   if (HOLIDAYS['2027-02-05']) throw new Error('설날 2027 is Feb 7 in Korea, so Feb 5 is a working day');
 });
 test('working hours: shaded on weekdays, not on holidays or weekends', () => {
-  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: true, workStart: 10, workEnd: 21 };
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: true, workRanges: [[10, 21]] };
   const days = ['2026-12-24', '2026-12-25', '2026-12-26'];
   const cols = renderTimeGrid({ days, occs: [], settings }).split('class="tg-col').slice(1);
   eq(cols.map((c) => c.includes('class="work"')), [true, false, false]);
   if (!cols[0].includes('top:90px;height:330px')) throw new Error('band should run 10 AM to 9 PM');
+});
+test('working hours: a band for each stretch (10–12, 1–6, 7–9 by default)', () => {
+  const settings = { dayStart: 7, dayEnd: 26, hourHeight: 30, h24: false, showWork: true, workRanges: DEFAULTS.workRanges };
+  const bands = renderTimeGrid({ days: ['2026-12-24'], occs: [], settings }).match(/class="work" style="[^"]*"/g);
+  eq(bands.map((b) => b.match(/top:[^"]*/)[0]), ['top:90px;height:60px', 'top:180px;height:150px', 'top:360px;height:60px']);
+});
+test('working hours: stretches in order, overlapping or meeting ones joined', () => {
+  eq(workSpans([[13, 18], [10, 12], [11, 13], [20, 19], [19, 21]]), [[10, 18], [19, 21]]);
+  eq(workSpans([]), []);
+  eq(workSpans(undefined), []);
 });
 
 // ---- moving by dragging
@@ -457,14 +468,23 @@ test('one date of a repeating deadline turns into a task; the rest keep repeatin
 });
 
 // ---- themes and their backups
-test('themes: colors survive hex → HSL → hex', () => {
-  for (const hex of ['#ffffff', '#000000', '#ffcbe1', '#1a1619', '#2f5f84', '#bfe6dd', '#7a5a06']) eq(hslToHex(hexToHsl(hex)), hex, hex);
-  eq([toHex('#abc'), toHex('rgba(70, 60, 66, 0.04)'), toHex(' #FFCBE1')], ['#aabbcc', '#463c42', '#ffcbe1']);
+test('themes: mixing two colors', () => {
+  eq([mix('#000000', '#ffffff', 0.5), mix('#ffcbe1', '#1a1619', 0), mix('#ffcbe1', '#1a1619', 1), mix('#ff0000', '#0000ff', 0.25)],
+    ['#808080', '#ffcbe1', '#1a1619', '#bf0040']);
 });
-test('themes: a dark background makes a dark theme, with its mixes', () => {
+test('themes: each of the seven sets every color, and has its own id and name', () => {
+  eq(PRESETS.length, 7);
+  eq(new Set(PRESETS.map((p) => p.id)).size, 7);
+  eq(new Set(PRESETS.map((p) => p.name)).size, 7);
+  for (const p of PRESETS) {
+    if (!['light', 'dark'].includes(p.base)) throw new Error(`${p.name}: base ${p.base}`);
+    const bad = KEYS.filter((k) => !/^#[0-9a-f]{6}$/.test(p.vars[k]));
+    if (bad.length) throw new Error(`${p.name}: ${bad.join(', ')}`);
+    for (const k of ['fill', 'today-tint', 'work']) if (!Number.isFinite(p.vars[k])) throw new Error(`${p.name}: ${k}`);
+  }
+});
+test("themes: a theme's variables, with its mixes", () => {
   const vars = { bg: '#161a24', fg: '#f3ecef', accent: '#bcd8ec', fill: 30, 'today-tint': 7, work: 3 };
-  eq(baseOf(vars), 'dark');
-  eq(baseOf({ ...vars, bg: '#fcf6f7' }), 'light');
   const css = cssVars('dark', vars);
   eq([css.bg, css.fill, css['today-tint'], css.work, css['accent-soft']],
     ['#161a24', '30%', '7%', 'color-mix(in srgb, var(--fg) 3% , transparent)'.replace(' ,', ','), 'color-mix(in srgb, var(--accent) 15%, var(--bg))']);

@@ -3,6 +3,7 @@ import { icons } from '../icons.js';
 import { colorOf } from '../labels.js';
 import { spanDays } from '../recurrence.js';
 import { holidayName } from '../holidays.js';
+import { workSpans } from '../settings.js';
 import { checkButton, isDone } from '../symbols.js';
 import { esc } from '../util.js';
 import { barHtml, layoutBars } from './bars.js';
@@ -50,12 +51,15 @@ export function slotOf(date, min, H1) {
   return min < off ? { day: addDays(date, -1), min: min + 1440 } : { day: date, min };
 }
 
-// Working hours on weekdays that aren't public holidays, very lightly shaded.
+// Working hours on weekdays that aren't public holidays, very lightly shaded:
+// a band for each stretch.
 function workBand(d, settings, H0, H1, scale, unit) {
   if (!settings.showWork || isWeekend(d) || holidayName(d)) return '';
-  const a = Math.max(settings.workStart * 60, H0);
-  const b = Math.min(settings.workEnd * 60, H1);
-  return b > a ? `<div class="work" style="top:${(a - H0) * scale}${unit};height:${(b - a) * scale}${unit}"></div>` : '';
+  return workSpans(settings.workRanges).map(([from, to]) => {
+    const a = Math.max(from * 60, H0);
+    const b = Math.min(to * 60, H1);
+    return b > a ? `<div class="work" style="top:${(a - H0) * scale}${unit};height:${(b - a) * scale}${unit}"></div>` : '';
+  }).join('');
 }
 
 // A day header: weekday and date; public holidays get their name as a tooltip.

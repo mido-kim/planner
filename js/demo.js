@@ -1,5 +1,4 @@
 import { addDays, dt, startOfWeek, today } from './dates.js';
-import { builtIn } from './themes.js';
 
 // Design preview (open the app with ?demo): sample events, deadlines, tasks
 // and labels around the current week that show every kind of item, kept in
@@ -61,14 +60,7 @@ export function demoStore(weekStart) {
     events: new Map(events.map((e) => [e.id, e])),
     tasks: new Map(tasks.map((x) => [x.id, x])),
     labels: new Map(labels.map((x) => [x.id, x])),
-    // A saved theme to pick in Settings: Dark in blueberry blues.
-    themes: new Map([['demo-theme', {
-      id: 'demo-theme', name: 'Blueberry night', base: 'dark', createdAt: now, updatedAt: now,
-      vars: {
-        ...builtIn('dark'), bg: '#161a24', 'bg-2': '#1b2030', 'bg-3': '#262d40', line: '#2d3447',
-        accent: '#bcd8ec', 'accent-fg': '#1d3550', 'accent-strong': '#8fb8dc', 'accent-ink': '#a9cdee', now: '#ff9a8a',
-      },
-    }]]),
+    themes: new Map(),
   };
   const snap = () => ({ events: new Map(data.events), tasks: new Map(data.tasks), labels: new Map(data.labels), themes: new Map(data.themes), pending: false });
   const subs = new Set();

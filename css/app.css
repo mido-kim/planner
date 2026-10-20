@@ -1302,8 +1302,6 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.4); }
 .clear-time { color: var(--fg-3); }
 .editor.no-time .clear-time { display: none; }
 .editor:not(.no-time) .no-time-hint { display: none; }
-.work-row .ctl { flex-wrap: nowrap; }
-.work-row .ctl > select { flex: 1 1 0; min-width: 0; }
 .editor.is-deadline .ev-only,
 .editor:not(.is-deadline) .dl-only,
 .editor.is-deadline .shape-row,
@@ -1380,6 +1378,16 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.4); }
 .settings section:last-of-type { border-bottom: 0; }
 .settings h3 { font-size: 12px; font-weight: 650; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.04em; padding-top: 4px; }
 .settings .field-row .lbl { width: 120px; }
+/* Working hours: a row for each stretch, and a button to add one. */
+.work-hours { align-items: flex-start; }
+.work-hours .lbl { padding-top: 8px; }
+.work-hours .ctl { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+.work-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.work-range { display: flex; align-items: center; gap: 6px; }
+.work-range select { flex: 1 1 0; min-width: 0; }
+.work-range .icon-btn { flex: none; color: var(--fg-3); }
+.work-hours .btn { align-self: flex-start; }
+.work-hours .btn svg { width: 14px; height: 14px; color: var(--fg-2); }
 .settings .btn-stack { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .settings .btn-stack .btn { justify-content: flex-start; }
 .sync-line { display: flex; gap: 8px; align-items: flex-start; color: var(--fg-2); font-size: 13px; }
@@ -1455,67 +1463,6 @@ kbd {
 .lpill input:focus-visible + span { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
 .settings .label-preview + div .btn svg { color: var(--fg-2); }
 
-.settings .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.settings .btn-row .btn svg { color: var(--fg-2); }
-
-/* The theme maker sits at the side (a phone: the lower half) with no dimming,
-   so the app shows each change as it's made. */
-dialog.theme-maker-dlg { width: min(400px, calc(100vw - 32px)); margin-right: 16px; }
-dialog.theme-maker-dlg::backdrop { background: transparent; }
-.theme-maker h3 { font-size: 12px; font-weight: 650; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 0 2px; }
-.tm-top { display: flex; gap: 8px; }
-.tm-top input { flex: 1; min-width: 0; font-family: var(--font-item); }
-.tm-top select { flex: none; width: auto; }
-.tm-group { display: flex; flex-direction: column; }
-.tm-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 6px 4px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  text-align: left;
-}
-.tm-row:hover, .tm-row[aria-expanded="true"] { background: var(--bg-hover); }
-.tm-sw { flex: none; width: 22px; height: 22px; border-radius: 6px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 18%, transparent); }
-.tm-name { flex: 1; min-width: 0; }
-.tm-val { flex: none; color: var(--fg-3); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; }
-.tm-sliders { display: grid; gap: 10px; padding: 8px 4px 12px 36px; }
-.tm-slider { display: grid; grid-template-columns: 74px 1fr; align-items: center; gap: 8px; color: var(--fg-2); font-size: 12.5px; }
-.tm-amount { display: grid; grid-template-columns: 1fr minmax(100px, 150px) 40px; align-items: center; gap: 10px; padding: 6px 4px; }
-.tm-amount .tm-val { text-align: right; }
-.theme-maker input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 14px;
-  margin: 0;
-  border-radius: 7px;
-  background: var(--bg-3);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 12%, transparent);
-  cursor: pointer;
-}
-.theme-maker input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 22px;
-  height: 22px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-.theme-maker input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-.theme-maker input[type="range"]:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
-
 /* The label manager. */
 .labels-dlg h3 { font-size: 12px; font-weight: 650; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 0 2px; }
 .labels-dlg section { display: flex; flex-direction: column; gap: 4px; }
@@ -1577,7 +1524,6 @@ dialog.theme-maker-dlg::backdrop { background: transparent; }
     border-radius: 16px 16px 0 0;
   }
   dialog.sheet .dlg { max-height: 92dvh; }
-  dialog.theme-maker-dlg, dialog.theme-maker-dlg .dlg { max-height: 56dvh; }
   dialog.sheet .dlg-foot { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
   .repeat-more { margin-left: 0; }
   .settings .field-row .lbl { width: 108px; }

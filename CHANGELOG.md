@@ -3,6 +3,19 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.8.0 (2026-10-21)
+
+- Working hours can be several stretches of the day, each shaded on its
+  own: Settings → Calendar → Working hours, with "Add hours" and a remove
+  button on each row. It starts at 10 AM–12 PM, 1–6 PM and 7–9 PM on every
+  device.
+- Seven more themes to switch between (Settings → Appearance → Theme), made
+  from well-loved color palettes. Light ones: Latte, Rosé Dawn and Nord
+  Snow. Dark ones: Mocha, Rosé Pine, Everforest and Tokyo Night. Light and
+  Dark stay as they were.
+- The theme maker with its sliders is gone. Themes made with it still show
+  in the list under "Made earlier".
+
 ## 0.7.1 (2026-10-20)
 
 - "No symbol" is a choice in every symbol picker (labels and events), for

@@ -10,10 +10,10 @@ export const DEFAULTS = {
   h24: false,
   hourHeight: 30, // pixels per hour, only when the day can't fit the screen
   view: 'week',
-  // Working hours, shaded on weekdays that aren't public holidays.
+  // Working hours, shaded on weekdays that aren't public holidays: any number
+  // of stretches, each [from, to] in hours.
   showWork: true,
-  workStart: 10,
-  workEnd: 21,
+  workRanges: [[10, 12], [13, 18], [19, 21]],
   // The agenda panel. On a PC it sits at the right or the bottom, and can be
   // hidden; on a phone it fills the bottom part of the screen (except in the
   // month view, where it comes up as a sheet).
@@ -44,6 +44,24 @@ export function loadSettings() {
     if (saved.dayEnd === 24) delete saved.dayEnd;
     saved.rev = 3;
   }
+  // 0.8.0: working hours became a list of stretches (one start and end
+  // before), and every device starts on the new default.
+  if (saved.rev < 4) {
+    delete saved.workStart;
+    delete saved.workEnd;
+    saved.rev = 4;
+  }
   return { ...DEFAULTS, ...saved };
+}
+
+// Working hours in order, with stretches that overlap or meet joined.
+export function workSpans(ranges) {
+  const out = [];
+  for (const [a, b] of (ranges || []).filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0])) {
+    const last = out[out.length - 1];
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
 }
 export const saveSettings = (s) => writeJSON(KEY, s);
