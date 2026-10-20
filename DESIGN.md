@@ -121,21 +121,22 @@ dark-mode block.
 |---|---|
 | Top bar | 10px / 14px padding; buttons 34px tall, 8px corners; title 19px semibold (18px phone) |
 | View switcher | 30px segments, 7px corners inside a 9px-corner track |
-| Day header | 52px tall (48 phone); weekday 11px uppercase; date 17px semibold in a 28px circle (today filled) |
-| Hour column | 56px wide (42 phone); labels 10.5px |
+| Day header | 52px tall (48 phone); weekday 12px uppercase; date 17px semibold in a 28px circle (today filled) |
+| Hour column | 56px wide (42 phone); labels 11.5px |
 | Hour height | Fits the screen: the hours shown (7 AM – 2 AM) share the height there is, so the timeline never scrolls (about 27px an hour on a PC, 15px in a phone's top half). Below 16px only every other hour is labelled and half-hour lines are left out. The Figma screens show the same |
 | Grid lines | hour: 1px line color; half-hour: 1px softer line |
-| Event block | 6px corners, solid pastel fill with its dark ink for text (dark mode: 30% of the pastel, pastel text), no edge bar; title 12px bold, up to 4 lines; time 11px; shortest 20px; under 36px tall shows one line, title first |
+| Event block | 6px corners, solid pastel fill with its dark ink for text (dark mode: 30% of the pastel, pastel text), no edge bar; padding 5px above the text, 3px below; title 13px bold, up to 4 lines; time 12px; shortest 20px; under 40px tall shows one line in the middle, title first |
 | Tentative event | 30% of the pastel, 1.5px dashed outline |
 | Working hours | 10 AM – 12 PM, 1 – 6 PM and 7 – 9 PM (set in Settings) on weekdays that aren't public holidays: a 4% warm gray over the column for each stretch (3% white in dark mode) |
 | Holidays | Date number in the danger red; name as a tooltip |
 | Text that doesn't fit | Cut where its box ends and faded over its last ~2 letters (never "…"); titles of several lines fade along their last line |
-| Moving | The item dims to 40%; a pink ghost with the new time shows where it lands; day moves tint the target days |
-| 2-week view | Two week rows; 30px day header, all-day strip (16px bars), then a timeline squeezed to fit; labels every 3 hours; blocks show the title only |
-| Event bar (all-day row) | 20px tall (18 in month, 16 phone), 5px corners, 11.5px text; Block = solid color, Arrows/Line = 2px line with the title in the middle, 8 × 10px arrowheads |
+| Moving | The item dims to 40%; a pink ghost with the new time shows where it lands; day moves tint the target days (weekends and today too) |
+| Selecting | Time: a pink block on each day it covers, square where it runs on into the next day. Days: the cells (55% accent) and, lightly, their day columns (30%) |
+| 2-week view | Two week rows; 30px day header, all-day strip (16px bars), then a timeline squeezed to fit; labels every 3 hours; blocks show the title and start time, 11px, 3px above; a block too short for that line shows it in the middle |
+| Event bar (all-day row) | 20px tall (18 in month, 16 phone), 5px corners, 12.5px text; Block = solid color, Arrows/Line = 2px line with the title in the middle, 8 × 10px arrowheads |
 | Deadline | 2px line across the day; title tag 16px tall, 10.5px bold white text on the color, 4px corners (square where it meets the line) |
-| Calendar task | 18px tall, no outline or background; a 10px round tick box (1.5px ring in the item's mid tone; done = filled with a white tick); title 11px bold in the item's ink |
-| Deadline tag | No background: flag in the mid tone and the name in the ink, 10.5px bold, sitting on its 2px line |
+| Calendar task | 18px tall, no outline or background; a 10px round tick box (1.5px ring in the item's mid tone; done = filled with a white tick); title 12px bold in the item's ink |
+| Deadline tag | No background: flag in the mid tone and the name in the ink, 11.5px bold, sitting on its 2px line |
 | Long task / deadline names | One line, cut and faded at the end of their own day. Names that would overlap each other, or an event's title, move up or down from their time until they're clear (those with a time stay closest to it; an event's title is only stepped around within 32px). Without a time they sit at midnight |
 | Now line | 2px red, 10px dot |
 | Month cell | date 12.5px in a 24px circle; events 18px tall, 11.5px text; "+N more" |

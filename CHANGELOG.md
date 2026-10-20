@@ -3,6 +3,27 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.8.1 (2026-10-21)
+
+- Text on the calendar is 1px larger: event names and times, all-day bars,
+  deadline and task names, month chips, hour numbers and weekday names. The
+  big date numbers stay as they were.
+- Event boxes leave a little more room above their text. A 2-week box too
+  short for a line of text shows its name in the middle instead, so the
+  letters aren't cut off.
+- Dragging to make something now works across days:
+  - On the week and 2-week timelines, drag from one day into another (in the
+    2-week view, on into the next week too) to select from that time to that
+    time. The menu offers an event for exactly that time, or an all-day
+    event on those days.
+  - In the 2-week view's all-day rows, a drag can go on into the other week.
+    Before, it jumped back to the same weekday of the first week.
+  - Wandering onto the hour labels, a date heading or past the last week
+    picks the nearest day instead of stopping.
+- Days being selected or dropped on are pink on weekends and today too.
+  Before, weekends kept their gray in the month and 2-week views, and the
+  day under the mouse in the month view showed its hover gray.
+
 ## 0.8.0 (2026-10-21)
 
 - Working hours can be several stretches of the day, each shaded on its

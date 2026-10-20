@@ -42,6 +42,14 @@ and setup, CHANGELOG.md for history.
   first. Long names stay on one line inside their day (faded by
   `fitText`); the user tried spilling into the next day and wrapping, and
   turned both down.
+- Making by drag (main.js `beginSelection` / `extendSelection` /
+  `chooseAndCreate`): a time selection is `anchor` / `cur` ([date, minute
+  on that day's timeline]) and can cross days and weeks (`timeSpan`,
+  `drawGhosts`: a block per day); a days selection (month cells, all-day
+  rows) is `from` / `to`. `dayAt` finds the day under any point in any view.
+  The `.sel` / `.drop` colors sit after the views in css so they beat the
+  weekend, today and hover shading. `squeezeMinis` marks 2-week blocks too
+  short for a line as `.short` (text centered).
 - main.js also has moving by drag (`beginMove` / `updateMove` / `endMove`,
   writes via `moveOps` in series.js) and `fitText`, which fades text that's
   cut off (`.fade` / `.fade-last`); the app never uses "…".

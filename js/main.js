@@ -258,8 +258,20 @@ function render() {
 
 function renderCalendar(r, rangeChanged, occs) {
   drawCalendar(r, rangeChanged, occs);
+  squeezeMinis($('#cal'));
   arrangeLabels($('#cal'));
   fitText($('#cal'));
+}
+
+// A 2-week block too short for a line of text below its top room shows its
+// one line in the middle instead (as short blocks on the week view do), so
+// the letters aren't cut off.
+function squeezeMinis(root) {
+  const minis = [...(root?.querySelectorAll('.ev.mini') || [])];
+  if (!minis.length) return;
+  const cs = getComputedStyle(minis[0]);
+  const need = parseFloat(cs.lineHeight) + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  for (const el of minis) el.classList.toggle('short', el.clientHeight < need);
 }
 
 // Task and deadline names in a day, once drawn: where one would overlap
@@ -802,19 +814,23 @@ const actions = {
 
 // ---------------------------------------------------------------- Creating by clicking or dragging
 
-// Clicking or dragging on the calendar selects a time range in one day column
-// (day and week views) or a run of days (month and 2-week cells, and the
-// all-day row), then asks what to make there. With a mouse, dragging starts
-// right away. On touch screens a drag scrolls as usual; hold for a moment
-// first to select instead, and a quick tap selects an hour.
+// Clicking or dragging on the calendar selects a stretch of time on a
+// timeline (day, week and 2-week views; it can run across days, and on into
+// the next week) or a run of days (month cells and the all-day rows), then
+// asks what to make there. With a mouse, dragging starts right away. On touch
+// screens a drag scrolls as usual; hold for a moment first to select instead,
+// and a quick tap selects an hour.
 
-let sel = null; // { type: 'time', col, date, start, end } or { type: 'days', anchor, from, to, at }
+// { type: 'time', anchor: [date, minute], cur: [date, minute] } or
+// { type: 'days', anchor, from, to, at } (dates), plus where it started.
+let sel = null;
 let mouseDown = false;
 let press = null; // a touch that may become a selection
 
 const ITEMS = '.ev, .dl, .tchip, .bar, .chip, .mchip, [data-goto], input, button, a';
 const surfaceAt = (target) => (target.closest(ITEMS) ? null : target.closest('.tg-col, .tw-col, .mv-cell, .ad-day'));
 const isTimeColumn = (el) => el.classList.contains('tg-col') || el.classList.contains('tw-col');
+const timeColumn = (date) => app.querySelector(`.tg-col[data-date="${date}"], .tw-col[data-date="${date}"]`);
 
 // The time at height y in a day column (whose top is the day's first hour
 // and bottom its last).
@@ -825,43 +841,65 @@ function minuteAt(col, y) {
   return Math.min(H1, Math.max(H0, H0 + ((y - r.top) / r.height) * (H1 - H0)));
 }
 
-// The range shown, on 15-minute steps, at least 15 minutes long.
-function drawGhost(s) {
-  const a = Math.floor(Math.min(s.start, s.end) / 15) * 15;
-  const b = Math.max(a + 15, Math.ceil(Math.max(s.start, s.end) / 15) * 15);
-  if (!s.ghost) {
-    s.ghost = document.createElement('div');
-    s.ghost.className = 'ghost';
-    s.col.append(s.ghost);
-  }
-  const span = (settings.dayEnd - settings.dayStart) * 60;
-  s.ghost.style.top = `${((a - settings.dayStart * 60) / span) * 100}%`;
-  s.ghost.style.height = `${((b - a) / span) * 100}%`;
-  return [a, b];
+// The day under a point: a month cell, an all-day row's day, a day column or
+// a day's heading. Anywhere else (the hour labels, past the last week), the
+// day nearest x in the row of days nearest y: a week of the month or of the
+// 2-week view, or the week view.
+const DAY_CELLS = '.mv-cell, .ad-day, .tg-col, .tw-col, .tg-dayhead, .tw-dayhead';
+function dayAt(x, y) {
+  const hit = [...app.querySelectorAll(DAY_CELLS)].find((c) => contains(c, x, y));
+  if (hit) return hit.dataset.date || hit.dataset.goto;
+  const off = (r, v, lo, hi) => (v < r[lo] ? r[lo] - v : v > r[hi] ? v - r[hi] : 0);
+  const nearest = (list, v, lo, hi) => list.map((el) => [el, off(el.getBoundingClientRect(), v, lo, hi)]).sort((p, q) => p[1] - q[1])[0]?.[0];
+  const row = nearest([...app.querySelectorAll('.mv-week, .tw-week, .tg')], y, 'top', 'bottom');
+  return row ? nearest([...row.querySelectorAll('.mv-cell, .tg-col, .tw-col')], x, 'left', 'right')?.dataset.date || null : null;
 }
 
-// The day cell under a point, among cells like `like` (same kind of cell).
-function dayAt(like, x, y) {
-  const strip = like.classList.contains('ad-day');
-  // In an all-day row, only that row's days, by x alone.
-  for (const c of (strip ? like.parentNode : app).querySelectorAll(strip ? '.ad-day' : '.mv-cell')) {
-    const r = c.getBoundingClientRect();
-    if (x >= r.left && x < r.right && (strip || (y >= r.top && y < r.bottom))) return c;
-  }
-  return null;
+// The selected time in order, on 15-minute steps and at least 15 minutes
+// long: [first day, its minute, last day, its minute]. Minutes are counted on
+// each day's own timeline (past 1440 when the day runs past midnight).
+function timeSpan(s) {
+  let [p, q] = [s.anchor, s.cur];
+  if (dt(...q) < dt(...p)) [p, q] = [q, p];
+  const a = Math.floor(p[1] / 15) * 15;
+  const b = Math.ceil(q[1] / 15) * 15;
+  return [p[0], a, q[0], p[0] === q[0] ? Math.max(b, a + 15) : b];
 }
 
+// Shows a time selection: a block on each of its days, from its start on the
+// first to its end on the last.
+function drawGhosts(s) {
+  s.ghosts?.forEach((g) => g.remove());
+  const [d1, a, d2, b] = timeSpan(s);
+  const H0 = settings.dayStart * 60;
+  const H1 = settings.dayEnd * 60;
+  s.ghosts = [...app.querySelectorAll('.tg-col, .tw-col')].filter((c) => c.dataset.date >= d1 && c.dataset.date <= d2).map((col) => {
+    const top = col.dataset.date === d1 ? a : H0;
+    const bottom = col.dataset.date === d2 ? b : H1;
+    const g = document.createElement('div');
+    // Square where it goes on into the day before or after.
+    g.className = ['ghost', col.dataset.date > d1 && 'ct', col.dataset.date < d2 && 'cb'].filter(Boolean).join(' ');
+    g.style.top = `${((top - H0) / (H1 - H0)) * 100}%`;
+    g.style.height = `${(Math.max(0, bottom - top) / (H1 - H0)) * 100}%`;
+    col.append(g);
+    return g;
+  });
+  return [d1, a, d2, b];
+}
+
+// Shows a run of days: their cells, and lightly their day columns.
 function markDays() {
-  app.querySelectorAll('.mv-cell, .ad-day').forEach((c) => c.classList.toggle('sel', !!sel && sel.type === 'days' && c.dataset.date >= sel.from && c.dataset.date <= sel.to));
+  const on = (d) => !!sel && sel.type === 'days' && d >= sel.from && d <= sel.to;
+  app.querySelectorAll('.mv-cell, .ad-day, .tg-col, .tw-col').forEach((c) => c.classList.toggle('sel', on(c.dataset.date)));
 }
 
 function beginSelection(surface, x, y) {
+  const d = surface.dataset.date;
   if (isTimeColumn(surface)) {
     const m = minuteAt(surface, y);
-    sel = { type: 'time', col: surface, date: surface.dataset.date, start: m, end: m, moved: false, x, y };
+    sel = { type: 'time', anchor: [d, m], cur: [d, m], moved: false, x, y };
   } else {
-    const d = surface.dataset.date;
-    sel = { type: 'days', cell: surface, anchor: d, from: d, to: d, at: d, moved: false, x, y };
+    sel = { type: 'days', anchor: d, from: d, to: d, at: d, moved: false, x, y };
     markDays();
   }
 }
@@ -870,12 +908,12 @@ function extendSelection(x, y) {
   if (!sel) return;
   if (Math.abs(x - sel.x) > 6 || Math.abs(y - sel.y) > 6) sel.moved = true;
   if (!sel.moved) return;
+  const d = dayAt(x, y);
   if (sel.type === 'time') {
-    sel.end = minuteAt(sel.col, y);
-    drawGhost(sel);
-  } else {
-    const d = dayAt(sel.cell, x, y)?.dataset.date;
-    if (!d) return;
+    const day = d && timeColumn(d) ? d : sel.cur[0];
+    sel.cur = [day, minuteAt(timeColumn(day), y)];
+    drawGhosts(sel);
+  } else if (d) {
     sel.at = d;
     [sel.from, sel.to] = d < sel.anchor ? [d, sel.anchor] : [sel.anchor, d];
     markDays();
@@ -883,7 +921,7 @@ function extendSelection(x, y) {
 }
 
 function clearSelection() {
-  sel?.ghost?.remove();
+  sel?.ghosts?.forEach((g) => g.remove());
   sel = null;
   markDays();
   stopAutoScroll();
@@ -913,7 +951,7 @@ function autoScroll(x, y, then) {
   };
   scrollTimer = requestAnimationFrame(step);
 }
-const followSelection = (x, y) => sel?.type === 'time' && sel.col.closest('.tg') && autoScroll(x, y, extendSelection);
+const followSelection = (x, y) => sel?.type === 'time' && $('.tg') && autoScroll(x, y, extendSelection);
 function stopAutoScroll() {
   cancelAnimationFrame(scrollTimer);
   scrollTimer = 0;
@@ -925,51 +963,65 @@ async function finishSelection(x, y) {
   if (!s) return;
   if (s.type === 'time' && !s.moved) {
     // A click (or tap) selects the hour from the half hour before.
-    s.start = Math.floor(s.start / 30) * 30;
-    s.end = Math.min(s.start + 60, settings.dayEnd * 60);
-    s.end = Math.max(s.end, s.start + 15);
+    const [d, m] = s.anchor;
+    const a = Math.floor(m / 30) * 30;
+    s.anchor = [d, a];
+    s.cur = [d, Math.max(Math.min(a + 60, settings.dayEnd * 60), a + 15)];
   }
   await chooseAndCreate(x, y, s);
 }
 
 // Asks what to make for selection `s`, then opens that editor. A deadline or
-// task goes where the pointer was let go.
+// task goes where the pointer was let go. Time across several days can also
+// become an all-day event on those days.
 async function chooseAndCreate(x, y, s) {
   sel = s;
+  const h24 = settings.h24;
+  const day = (d, weekday = true) => fmt(d, { ...(weekday && { weekday: 'short' }), month: 'short', day: 'numeric' });
   let heading;
   let make;
-  let when = '';
+  let choices;
   if (s.type === 'time') {
-    const [a, b] = drawGhost(s);
-    const at = s.moved ? Math.round(Math.min(Math.max(s.end, settings.dayStart * 60), settings.dayEnd * 60 - 1) / 15) * 15 : a;
-    heading = `${fmt(s.date, { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtTimeRange(a, b, settings.h24)}`;
+    const [d1, a, d2, b] = drawGhosts(s);
+    const [atDay, atMin] = s.moved
+      ? [s.cur[0], Math.round(Math.min(Math.max(s.cur[1], settings.dayStart * 60), settings.dayEnd * 60 - 1) / 15) * 15]
+      : [d1, a];
+    const start = dt(d1, a);
+    const end = dt(d2, b);
+    const oneDay = d1 === d2;
+    heading = oneDay
+      ? `${day(d1)} · ${fmtTimeRange(a, b, h24)}`
+      : `${day(dateOf(start))}, ${fmtTime(a, h24)} – ${day(dateOf(end))}, ${fmtTime(b, h24)}`;
     make = {
-      event: () => newEvent(s.date, a, b),
-      deadline: () => newDeadline(s.date, at),
-      task: () => newTask(s.date, at),
+      event: () => openNewEvent({ start, end }),
+      allDay: () => openNewEvent({ allDay: true, start: d1, end: d2 }),
+      deadline: () => newDeadline(atDay, atMin),
+      task: () => newTask(atDay, atMin),
     };
-    when = fmtTime(at, settings.h24);
+    const when = `${fmtTime(atMin, h24)}${oneDay ? '' : `, ${day(atDay, false)}`}`;
+    choices = [
+      ['event', icons.event, 'Event'],
+      ...(oneDay ? [] : [['allDay', icons.event, `All-day event · ${day(d1, false)} – ${day(d2, false)}`]]),
+      ['deadline', icons.flagBtn, `Deadline · ${when}`],
+      ['task', icons.task, `Task · ${when}`],
+    ];
   } else {
     markDays();
     const one = s.from === s.to;
-    heading = one ? fmt(s.from, { weekday: 'short', month: 'short', day: 'numeric' }) : spanLabel(s.from, s.to);
+    heading = one ? day(s.from) : spanLabel(s.from, s.to);
     make = {
-      event: () => openNewEvent({ allDay: true, start: s.from, end: s.to }),
+      allDay: () => openNewEvent({ allDay: true, start: s.from, end: s.to }),
       deadline: () => newDeadline(s.at),
       task: () => newTask(s.at),
     };
+    const at = one ? '' : ` · ${day(s.at, false)}`;
+    choices = [
+      ['allDay', icons.event, 'All-day event'],
+      ['deadline', icons.flagBtn, `Deadline${at}`],
+      ['task', icons.task, `Task${at}`],
+    ];
   }
-  const atDay = s.type === 'days' && s.from !== s.to ? ` · ${fmt(s.at, { month: 'short', day: 'numeric' })}` : '';
-  const choice = await createMenu({
-    x,
-    y,
-    heading,
-    choices: [
-      ['event', icons.event, s.type === 'days' ? 'All-day event' : 'Event'],
-      ['deadline', icons.flagBtn, `Deadline${s.type === 'time' ? ` · ${when}` : atDay}`],
-      ['task', icons.task, `Task${s.type === 'time' ? ` · ${when}` : atDay}`],
-    ],
-  });
+  const choice = await createMenu({ x, y, heading, choices });
   clearSelection();
   if (choice) make[choice]();
 }
@@ -1284,8 +1336,8 @@ function wireGestures() {
       beginSelection(surface, p.x, p.y);
       sel.moved = true; // a held finger selects from where it is
       if (sel.type === 'time') {
-        sel.end = sel.start + 15;
-        drawGhost(sel);
+        sel.cur = [sel.anchor[0], sel.anchor[1] + 15];
+        drawGhosts(sel);
       }
       navigator.vibrate?.(10);
     }, LONG_PRESS_MS);

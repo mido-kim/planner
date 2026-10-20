@@ -398,7 +398,7 @@ function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX, labels = new Map()
   const ev = occ.ev;
   const top = (seg.va - H0) * ppm;
   const height = Math.max((seg.vb - seg.va) * ppm, minPx);
-  const short = height < 36;
+  const short = height < 40;
   const title = esc(ev.title || '(No title)');
   const time = fmtTimeRange(minOf(occ.start), minOf(occ.end), h24);
   const repeat = ev.rrule || ev.seriesId ? `<span class="ev-rep" title="Repeats">${icons.repeat}</span>` : '';

@@ -447,7 +447,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   padding: 0;
   min-width: 0;
 }
-.tg-dayhead .dow { font-size: 11px; font-weight: 600; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.tg-dayhead .dow { font-size: 12px; font-weight: 600; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; }
 .tg-dayhead .dom {
   display: grid;
   place-items: center;
@@ -474,7 +474,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   left: 0;
   z-index: 22;
   padding: 7px 8px 0 0;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--fg-3);
   text-align: right;
 }
@@ -496,7 +496,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   height: 20px;
   padding: 0 6px;
   border-radius: 5px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -526,7 +526,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   position: absolute;
   right: 8px;
   transform: translateY(-50%);
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--fg-3);
   white-space: nowrap;
 }
@@ -577,14 +577,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 3px 6px;
+  padding: 5px 6px 3px;
   overflow: hidden;
   border-radius: 6px;
   background: var(--bg-3);
   background: var(--cf);
   color: var(--ci);
   box-shadow: 0 0 0 1px var(--bg);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.25;
   cursor: pointer;
 }
@@ -600,7 +600,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 12px;
   opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;
@@ -630,8 +630,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mchip.tent .dot { background: transparent; border: 1.5px dashed var(--cl); }
 .mchip.tent:not(.fill) .mtt { color: var(--fg-2); }
 
-.ad-day.sel, .mv-cell.sel { background: color-mix(in srgb, var(--accent) 55%, var(--bg)); }
-
 /* Text cut where its box ends fades out toward the end instead of "…". */
 .fade {
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.8em), transparent);
@@ -660,13 +658,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 /* Moving an item: it dims, and where it would land is shown. */
 .moving { opacity: 0.4; }
-.ad-day.drop, .mv-cell.drop, .tg-col.drop, .tw-col.drop { background-color: color-mix(in srgb, var(--accent) 45%, var(--bg)); }
 .ghost.move {
   z-index: 40;
   display: flex;
   justify-content: flex-end;
   padding: 1px 5px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--accent-fg);
   white-space: nowrap;
@@ -682,19 +679,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   pointer-events: none;
   z-index: 3;
 }
+.ghost.ct { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.ghost.cb { border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 
 @media (max-width: 760px) {
   :root { --axis-w: 42px; --head-h: 48px; }
-  .tg-axis span { right: 5px; font-size: 9.5px; }
-  .tg.n7 .ev { padding: 2px 3px; font-size: 11px; border-radius: 4px; }
+  .tg-axis span { right: 5px; font-size: 10.5px; }
+  .tg.n7 .ev { padding: 4px 3px 2px; font-size: 12px; border-radius: 4px; }
   .tg.n7 .ev .ev-m { display: none; }
   .tg.n7 .ev.short { padding-top: 0; padding-bottom: 0; }
-  .tg.n7 .chip, .tg.n7 .bar { font-size: 10.5px; }
+  .tg.n7 .chip, .tg.n7 .bar { font-size: 11.5px; }
   .tg.n7 .chip { padding: 0 3px; }
   .tg.n7 .chip.oor > svg { display: none; }
   .tg.n7 .bar.shape-block { padding: 0 3px; }
-  .tg.n7 .tchip { font-size: 10px; padding: 0 3px 0 2px; gap: 2px; }
-  .tg.n7 .dl-tag { font-size: 9.5px; padding: 0 3px 0 0; gap: 1px; }
+  .tg.n7 .tchip { font-size: 11px; padding: 0 3px 0 2px; gap: 2px; }
+  .tg.n7 .dl-tag { font-size: 10.5px; padding: 0 3px 0 0; gap: 1px; }
   .tg.n7 .sym-svg { width: 10px; height: 10px; }
   .tg-dayhead .dom { font-size: 18px; min-width: 26px; height: 26px; }
 }
@@ -723,7 +722,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   border: 0;
   background: none;
 }
-.tw-dayhead .dow { font-size: 10.5px; font-weight: 600; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.tw-dayhead .dow { font-size: 11.5px; font-weight: 600; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.04em; }
 .tw-dayhead .dom { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; font-size: 15px; font-weight: 700; white-space: nowrap; }
 .tw-dayhead:hover .dom { background: var(--bg-hover); }
 .tw-dayhead.today .dow { color: var(--accent-ink); }
@@ -731,10 +730,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tw-dayhead.past .dom { color: var(--fg-2); }
 .tw-adlabel { border-bottom: 1px solid var(--line-soft); }
 .tw-allday { position: relative; grid-column: 2 / -1; min-width: 0; border-bottom: 1px solid var(--line-soft); --bar-h: 16px; --bar-pad: 1px; }
-.tw-allday .chip { position: absolute; height: 16px; padding: 0 3px; font-size: 10px; }
-.tw-allday .bar { font-size: 10.5px; }
+.tw-allday .chip { position: absolute; height: 16px; padding: 0 3px; font-size: 11px; }
+.tw-allday .bar { font-size: 11.5px; }
 .tw-axis { position: relative; min-height: 0; }
-.tw-axis span { position: absolute; right: 5px; transform: translateY(-50%); font-size: 9.5px; color: var(--fg-3); white-space: nowrap; }
+.tw-axis span { position: absolute; right: 5px; transform: translateY(-50%); font-size: 10.5px; color: var(--fg-3); white-space: nowrap; }
 .tw-col {
   position: relative;
   min-width: 0;
@@ -752,20 +751,24 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .tw-col.wkend { background-color: var(--bg-2); }
 .tw-col.today { background-color: color-mix(in srgb, var(--accent) var(--today-tint), var(--bg)); }
-.ev.mini { flex-flow: row wrap; align-content: flex-start; gap: 0 3px; min-height: 3px; padding: 1px 3px; border-radius: 3px; font-size: 10px; line-height: 1.15; }
+.ev.mini { flex-flow: row wrap; align-content: flex-start; gap: 0 3px; min-height: 3px; padding: 3px 3px 1px; border-radius: 3px; font-size: 11px; line-height: 1.15; }
 .ev.mini .ev-m { flex: none; font-size: 0.9em; opacity: 0.8; white-space: nowrap; }
+/* A block too short for a line under its top room (main.js squeezeMinis)
+   shows its one line in the middle instead, as the week view does. */
+.ev.mini.short { flex-wrap: nowrap; align-items: center; padding-top: 0; padding-bottom: 0; }
+.ev.mini.short .ev-m { flex: 0 1 auto; min-width: 0; overflow: hidden; }
 
-.tw .dl-tag { height: 12px; padding: 0 3px; font-size: 9px; line-height: 12px; }
+.tw .dl-tag { height: 13px; padding: 0 3px; font-size: 10px; line-height: 13px; }
 .tw .sym-svg { width: 9px; height: 9px; }
 .tw .dl-tag { gap: 1px; padding-left: 0; }
-.tw .tchip { height: 15px; gap: 2px; padding: 0 3px 0 2px; border-radius: 4px; font-size: 9.5px; }
+.tw .tchip { height: 15px; gap: 2px; padding: 0 3px 0 2px; border-radius: 4px; font-size: 10.5px; }
 .tw .tchip input { width: 9px; height: 9px; }
 @media (max-width: 760px) {
   .tw-week { --tw-axis: 24px; }
   .tw-dayhead { flex-direction: column; gap: 0; height: 36px; }
   .tw-dayhead .dom { min-width: 20px; height: 20px; font-size: 14px; }
-  .tw-axis span { right: 3px; font-size: 8.5px; }
-  .ev.mini { padding: 0 2px; font-size: 9px; }
+  .tw-axis span { right: 3px; font-size: 9.5px; }
+  .ev.mini { padding: 2px 2px 0; font-size: 10px; }
 }
 
 /* ------------------------------------------------------------------ Bars (all-day and multi-day events) */
@@ -782,7 +785,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   height: var(--bar-h, 18px);
   padding: 0 6px;
   border-radius: 5px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -852,7 +855,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   height: 16px;
   padding: 0 4px 0 1px;
   color: var(--ci);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   line-height: 16px;
   white-space: nowrap;
@@ -880,7 +883,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   padding: 0 5px 0 2px;
   border-radius: 5px;
   color: var(--ci);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -979,7 +982,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mv-dow {
   align-self: center;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--fg-3);
   text-transform: uppercase;
@@ -1029,7 +1032,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   flex: none;
   padding: 0 4px;
   border-radius: 4px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   white-space: nowrap;
   overflow: hidden;
 }
@@ -1045,13 +1048,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .mchip.mtask input { flex: none; }
 .mchip.mtask .mtt { color: var(--ci); font-weight: 600; }
 .mchip.mtask.done .mtt { text-decoration: line-through; color: var(--fg-3); }
-.mv-more { padding: 0 4px; font-size: 11px; font-weight: 600; color: var(--fg-2); cursor: pointer; border-radius: 4px; }
+.mv-more { padding: 0 4px; font-size: 12px; font-weight: 600; color: var(--fg-2); cursor: pointer; border-radius: 4px; }
 .mv-more:hover { background: var(--bg-3); }
 
 @media (max-width: 760px) {
   .mv { --mtop: 26px; --mrow: 17px; --bar-h: 16px; --bar-pad: 1px; }
   .mv-cell { padding: 1px 1px 2px; }
-  .mchip { padding: 0 2px; font-size: 10px; gap: 2px; height: 16px; }
+  .mchip { padding: 0 2px; font-size: 11px; gap: 2px; height: 16px; }
   .mchip .mt, .mchip .dot { display: none; }
   /* No room for the dot on a phone, so timed events get a light tint. */
   .mchip:not(.dline):not(.mtask) { background: var(--cf); color: var(--ci); }
@@ -1059,11 +1062,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .mchip .sym-svg { width: 9px; height: 9px; }
   .mchip.tent:not(.dline):not(.mtask) { background: transparent; box-shadow: inset 0 0 0 1px var(--cl); }
   .mchip.dline svg { width: 9px; height: 9px; }
-  .mv .bar { font-size: 10px; }
+  .mv .bar { font-size: 11px; }
   .mv .bar.shape-block { padding: 0 3px; }
-  .mv-more { font-size: 10px; padding: 0 2px; }
+  .mv-more { font-size: 11px; padding: 0 2px; }
   .mv-num span { font-size: 13px; min-width: 22px; height: 22px; }
 }
+
+/* ------------------------------------------------------------------ Selecting and dropping */
+
+/* Days being selected to make something, or an item being moved onto. These
+   come after the views so they show over weekend, today and hover shading. */
+.ad-day.sel, .mv-cell.sel { background-color: color-mix(in srgb, var(--accent) 55%, var(--bg)); }
+.tg-col.sel, .tw-col.sel { background-color: color-mix(in srgb, var(--accent) 30%, var(--bg)); }
+.ad-day.drop, .mv-cell.drop, .tg-col.drop, .tw-col.drop { background-color: color-mix(in srgb, var(--accent) 45%, var(--bg)); }
 
 /* ------------------------------------------------------------------ Agenda panel */
 
