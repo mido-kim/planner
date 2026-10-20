@@ -3,6 +3,25 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.9.0 (2026-10-21)
+
+- Light is now called **Gelato Days**, after the palette its colors came
+  from, and Dark is **Gelato Nights**. They look the same as before.
+- Fifteen pastel themes, in their own "Pastel" group under Settings →
+  Appearance → Theme: Lazy Days, Lilac Dreamer, Summer Energy, Feeling Fall,
+  Sweet Sunset, Sophisticated City, In The Sunshine, Garden Party, Periwinkle
+  Cloud, Enchanting Forest, Toned Down, Smoothie Bar, Blues, Cafe Mocha and
+  Pastel Coffee Shop. Each takes its background tint, text and accent from
+  its palette. Label colors stay distinct (blue is still blue), but take on
+  the palette's softness and use its own color wherever one is close.
+- Swiping on a phone is smoother:
+  - The dates move as layers while your finger drags them.
+  - When you let go, they glide on at your finger's speed instead of
+    stopping and starting again.
+  - The settle is a touch calmer.
+  - The agenda waits until the dates have settled before it redraws.
+  The mouse wheel and buttons on a PC move the same as before.
+
 ## 0.8.1 (2026-10-21)
 
 - Text on the calendar is 1px larger: event names and times, all-day bars,

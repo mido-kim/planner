@@ -25,11 +25,15 @@ an app on a PC (Chrome) and an iPhone (Safari).
   at the right or the bottom (drag its edge to resize, or hide it); on a phone
   it fills the lower half of the screen. Tasks with a date also show on the
   calendar, with a tick box.
-- **Gelato colors:** soft pastel colors throughout, in light and dark mode.
-- **Themes** (Settings → Appearance): System (light or dark as the device is
-  set), Light, Dark, and seven made from well-loved color palettes: Latte,
-  Rosé Dawn and Nord Snow (light); Mocha, Rosé Pine, Everforest and Tokyo
-  Night (dark). Each device picks its own.
+- **Gelato colors:** soft pastel colors throughout: Gelato Days (light) and
+  Gelato Nights (dark).
+- **Themes** (Settings → Appearance): System (Gelato Days or Gelato Nights,
+  as the device is set), seven from well-loved editor palettes (Latte, Rosé
+  Dawn and Nord Snow; Mocha, Rosé Pine, Everforest and Tokyo Night), and
+  fifteen light pastel ones (Lazy Days, Lilac Dreamer, Summer Energy, Feeling
+  Fall, Sweet Sunset, Sophisticated City, In The Sunshine, Garden Party,
+  Periwinkle Cloud, Enchanting Forest, Toned Down, Smoothie Bar, Blues, Cafe
+  Mocha, Pastel Coffee Shop). Each device picks its own.
 - **Drag to move** events, deadlines and tasks to another time or day.
 - **Check off** tasks (tick box), deadlines (the flag) and events (the little
   symbol in front of the name: a check box, or a heart, star, book, beaker…
@@ -153,7 +157,7 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 | File | What it does |
 |---|---|
 | `index.html`, `css/app.css` | Page and styles (light and dark) |
-| `js/themes.js`, `js/theme-boot.js` | Themes: Light, Dark and the palette themes, applied before the page shows |
+| `js/themes.js`, `js/theme-boot.js` | Themes: Gelato Days and Nights and the palette themes, applied before the page shows |
 | `js/main.js` | App startup, layout, navigation and input |
 | `js/views/timegrid.js` | Day / week timeline and the 2-week view |
 | `js/views/month.js` | Month grid |

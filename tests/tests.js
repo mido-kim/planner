@@ -7,7 +7,7 @@ import { HOLIDAYS } from '../js/holidays.js';
 import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
 import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
-import { cssVars, KEYS, mix, PRESETS } from '../js/themes.js';
+import { cssVars, fromHsl, KEYS, mix, PRESETS, presetOf, toHsl } from '../js/themes.js';
 import { DEFAULTS, workSpans } from '../js/settings.js';
 import { doneOps, isDone, symbolOf } from '../js/symbols.js';
 
@@ -472,15 +472,34 @@ test('themes: mixing two colors', () => {
   eq([mix('#000000', '#ffffff', 0.5), mix('#ffcbe1', '#1a1619', 0), mix('#ffcbe1', '#1a1619', 1), mix('#ff0000', '#0000ff', 0.25)],
     ['#808080', '#ffcbe1', '#1a1619', '#bf0040']);
 });
-test('themes: each of the seven sets every color, and has its own id and name', () => {
-  eq(PRESETS.length, 7);
-  eq(new Set(PRESETS.map((p) => p.id)).size, 7);
-  eq(new Set(PRESETS.map((p) => p.name)).size, 7);
+test('themes: hex → HSL → hex', () => {
+  for (const hex of ['#ffffff', '#000000', '#ffcbe1', '#2f5f84', '#97b3ae', '#4b3727']) eq(fromHsl(...toHsl(hex)), hex, hex);
+});
+test('themes: each preset sets every color, and has its own id and name', () => {
+  eq(PRESETS.length, 22);
+  eq(new Set(PRESETS.map((p) => p.id)).size, 22);
+  eq(new Set(PRESETS.map((p) => p.name)).size, 22);
+  eq(PRESETS.filter((p) => p.pastel && p.base === 'light').length, 15);
   for (const p of PRESETS) {
     if (!['light', 'dark'].includes(p.base)) throw new Error(`${p.name}: base ${p.base}`);
     const bad = KEYS.filter((k) => !/^#[0-9a-f]{6}$/.test(p.vars[k]));
     if (bad.length) throw new Error(`${p.name}: ${bad.join(', ')}`);
     for (const k of ['fill', 'today-tint', 'work']) if (!Number.isFinite(p.vars[k])) throw new Error(`${p.name}: ${k}`);
+  }
+});
+test('themes: a pastel palette lends its own colors where one is close, and keeps the rest apart', () => {
+  const blues = presetOf('preset-blues').vars;
+  eq(blues['c-blue'], '#bdd7e7'); // the palette's own light blue
+  const lazy = presetOf('preset-lazy-days').vars;
+  eq([lazy['c-red'], lazy.accent], ['#f2c3b9', '#f2c3b9']);
+  // Every item color stays its own color.
+  for (const p of PRESETS.filter((x) => x.pastel)) {
+    const fills = ['blue', 'teal', 'green', 'yellow', 'orange', 'red', 'pink', 'purple', 'gray'].map((c) => p.vars[`c-${c}`]);
+    if (new Set(fills).size !== 9) throw new Error(`${p.name}: two item colors are the same`);
+    // Text on a fill stays dark enough to read.
+    for (const c of ['blue', 'teal', 'green', 'yellow', 'orange', 'red', 'pink', 'purple', 'gray']) {
+      if (toHsl(p.vars[`ink-${c}`])[2] > 46) throw new Error(`${p.name}: ${c} ink too light`);
+    }
   }
 });
 test("themes: a theme's variables, with its mixes", () => {

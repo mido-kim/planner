@@ -405,11 +405,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   overflow: hidden;
 }
 
-/* Moving to the next or previous dates: they slide in from that side. */
 /* Gliding to other dates (main.js glide): the old dates lie over the new
    ones while both move; nothing scrolls or takes a tap meanwhile. */
 .cal > .leaving { position: absolute; inset: 0; z-index: 30; overflow: hidden; pointer-events: none; }
 .cal > .gliding { overflow: hidden; }
+/* The moving parts get layers of their own while they move. */
+:is(.gliding, .leaving) :is(.tg-grid > :not(.tg-corner, .tg-adlabel, .tg-axis), .mv-week, .tw-week) { will-change: transform; }
 
 /* ------------------------------------------------------------------ Timeline (day / week / 2 weeks) */
 

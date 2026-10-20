@@ -1,8 +1,9 @@
 import { COLORS } from './util.js';
 
-// Themes: the app's own Light and Dark (css/app.css, picked by data-theme on
-// <html>), seven more made from well-loved color palettes (PRESETS), and any
-// saved in the data by an earlier version's theme maker. A theme other than
+// Themes: the app's own Gelato Days and Gelato Nights (Light and Dark in
+// css/app.css, picked by data-theme on <html>), more made from color palettes
+// (PRESETS: seven from well-loved editor palettes, and light pastel ones),
+// and any saved in the data by an earlier version's theme maker. A theme other than
 // Light and Dark is { base: 'light' | 'dark', vars }, where `vars` has a
 // color ('#rrggbb') for each CSS variable in KEYS and a percent for `fill`,
 // `today-tint` and `work`; they go on <html> over the base's own. Which theme
@@ -22,6 +23,107 @@ const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 export function mix(a, b, t) {
   const [x, y] = [rgb(a), rgb(b)];
   return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`;
+}
+
+// '#rrggbb' to [hue 0–360, saturation 0–100, lightness 0–100], and back.
+export function toHsl(hex) {
+  const [r, g, b] = rgb(hex).map((v) => v / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (!d) return [0, 0, l * 100];
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, (d / (1 - Math.abs(2 * l - 1))) * 100, l * 100];
+}
+export function fromHsl(h, s, l) {
+  s = Math.min(Math.max(s, 0), 100) / 100;
+  l = Math.min(Math.max(l, 0), 100) / 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return `#${[0, 8, 4].map((n) => Math.round(f(n) * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+const hueGap = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
+
+// ---------------------------------------------------------------- Pastel palettes
+
+// Gelato Days' item colors (css/app.css :root): each one's pastel fill and its
+// ink for text. A pastel theme starts from these.
+const GELATO = {
+  blue: ['#bcd8ec', '#2f5f84'], teal: ['#bfe6dd', '#23695c'], green: ['#d6e5bd', '#4d6b2a'],
+  yellow: ['#f9e1a8', '#7a5a06'], orange: ['#ffdab4', '#8a4e14'], red: ['#ffc2ba', '#a33a2e'],
+  pink: ['#ffcbe1', '#a3366a'], purple: ['#dcccec', '#6243a0'], gray: ['#ddd7d3', '#5e5853'],
+};
+
+// A light theme from a pastel palette (five or six colors) and its signature
+// color, `accent`:
+// - backgrounds and lines: near-white, tinted with its lightest color;
+// - text: a deep shade of its darkest color;
+// - each item color keeps its own hue, so labels stay easy to tell apart, but
+//   is as soft as the palette's colors are, and takes the palette's own color
+//   where one is close in hue (each palette color goes to one item color at
+//   most, and only so close that the colors keep their order).
+function pastel(id, name, palette, accent) {
+  const cols = palette.map((hex) => ({ hex, hsl: toHsl(hex) }));
+  const byL = [...cols].sort((a, b) => a.hsl[2] - b.hsl[2]);
+  const [th, ts] = byL[byL.length - 1].hsl;
+  const [dh, ds] = byL[0].hsl;
+  const tint = (l, s) => fromHsl(th, Math.min(ts, s), l);
+  const deep = (l, s) => fromHsl(dh, Math.min(ds, s), l);
+  const colored = cols.filter(({ hsl: [, s, l] }) => s >= 12 && l >= 40 && l <= 95);
+  const avgS = colored.reduce((n, c) => n + c.hsl[1], 0) / (colored.length || 1);
+  const mood = Math.min(Math.max(avgS / 66, 0.5), 1);
+
+  const hues = COLORS.filter((c) => c !== 'gray').map((c) => ({ c, h: toHsl(GELATO[c][0])[0] }));
+  const reach = (f) => Math.min(22, ...hues.filter((g) => g !== f).map((g) => hueGap(f.h, g.h) / 2));
+  // Only colors light enough to fill a block but not so light they're a
+  // background; nearer in hue first, then nearer a pastel's lightness.
+  const pairs = hues.flatMap((f) => cols.filter((p) => p.hsl[1] >= 25 && p.hsl[2] >= 55 && p.hsl[2] <= 90 && hueGap(f.h, p.hsl[0]) <= reach(f))
+    .map((p) => ({ c: f.c, p, score: hueGap(f.h, p.hsl[0]) + Math.abs(p.hsl[2] - 84) / 4 })));
+  const taken = new Map();
+  for (const { c, p } of pairs.sort((a, b) => a.score - b.score)) {
+    if (!taken.has(c) && ![...taken.values()].includes(p)) taken.set(c, p);
+  }
+
+  const [ah, as, al] = toHsl(accent);
+  const accentFill = al >= 78 ? accent : fromHsl(ah, Math.max(as, 25), 82);
+  const items = {};
+  for (const c of COLORS) {
+    const [fh, fs, fl] = toHsl(GELATO[c][0]);
+    const [, is, il] = toHsl(GELATO[c][1]);
+    if (c === 'gray') {
+      // A truly neutral light color of the palette's, or a gray warmed by
+      // its tint.
+      const n = cols.filter(({ hsl: [, s2, l2] }) => s2 < 12 && l2 >= 70 && l2 <= 92).sort((a, b) => a.hsl[1] - b.hsl[1])[0];
+      const [h, sat, l] = n ? n.hsl : [th, Math.min(ts * 0.5, 14), 84];
+      items['c-gray'] = fromHsl(h, sat, l);
+      items['ink-gray'] = fromHsl(h, Math.min(sat, 10), il);
+      continue;
+    }
+    const p = taken.get(c);
+    const [h, sat, l] = p ? [p.hsl[0], p.hsl[1], Math.min(Math.max(p.hsl[2], 76), 90)] : [fh, fs * mood, fl];
+    // Colors not from the palette share a little of its accent, so they sit
+    // together with it.
+    items[`c-${c}`] = p ? fromHsl(h, sat, l) : mix(fromHsl(h, sat, l), accentFill, 0.15);
+    items[`ink-${c}`] = fromHsl(h, is * Math.max(mood, 0.6), il);
+  }
+
+  const vars = {
+    bg: tint(99.2, 60), 'bg-2': tint(97, 55), 'bg-3': tint(93.5, 38), line: tint(90.5, 28),
+    fg: deep(16, 14), 'fg-2': deep(40, 10), 'fg-3': deep(61, 9),
+    danger: '#c93a55',
+    accent: accentFill,
+    'accent-fg': fromHsl(ah, Math.min(Math.max(as, 40), 50), 20),
+    'accent-strong': fromHsl(ah, Math.min(Math.max(as, 40), 70), 70),
+    'accent-ink': fromHsl(ah, Math.min(Math.max(as, 45), 60), 38),
+    now: fromHsl(ah, Math.min(Math.max(as, 55), 80), 60),
+    ...items,
+    fill: 100, 'today-tint': 14, work: 4,
+  };
+  return { id, name, base: 'light', pastel: true, vars };
 }
 
 // ---------------------------------------------------------------- Presets
@@ -88,6 +190,23 @@ export const PRESETS = [
     danger: '#f7768e', now: '#ff9e64', accent: '#7aa2f7',
     items: ITEMS('#7aa2f7', '#73daca', '#9ece6a', '#e0af68', '#ff9e64', '#f7768e', mix('#bb9af7', '#f7768e', 0.5), '#bb9af7', '#a9b1d6'),
   }),
+  // Light themes from pastel palettes, each with its signature color as the
+  // accent (most from Design Pixie; Blues is ColorBrewer's).
+  pastel('preset-lazy-days', 'Lazy Days', ['#97b3ae', '#d2e0d3', '#f0ddd6', '#f2c3b9', '#d6cbbf', '#f0eeea'], '#f2c3b9'),
+  pastel('preset-lilac-dreamer', 'Lilac Dreamer', ['#c8ceee', '#e8daf0', '#f3e4f5', '#fcdce1', '#d8bee5', '#a7abde'], '#d8bee5'),
+  pastel('preset-summer-energy', 'Summer Energy', ['#ffcce1', '#f2f1ed', '#cde5d9', '#f2ebcc', '#c6e2e7', '#f7dde8'], '#c6e2e7'),
+  pastel('preset-feeling-fall', 'Feeling Fall', ['#ffd4d9', '#deb499', '#f9ede1', '#ffcabe', '#fce0d2', '#f7c5ad'], '#f7c5ad'),
+  pastel('preset-sweet-sunset', 'Sweet Sunset', ['#fec3e1', '#ffceda', '#ffdad5', '#ffe7cf', '#fef1c8', '#f9f1eb'], '#fec3e1'),
+  pastel('preset-sophisticated-city', 'Sophisticated City', ['#9babbe', '#d0d9e2', '#c3c2d5', '#ebe2dd', '#d9c8bf', '#dedde7'], '#9babbe'),
+  pastel('preset-in-the-sunshine', 'In The Sunshine', ['#f0e2c3', '#dcece9', '#f2eae0', '#f6c7b3', '#c3dedd', '#82b2c0'], '#f6c7b3'),
+  pastel('preset-garden-party', 'Garden Party', ['#f9c7d4', '#859e91', '#c3d0a8', '#f0eee2', '#f7e0e4', '#99ac73'], '#c3d0a8'),
+  pastel('preset-periwinkle-cloud', 'Periwinkle Cloud', ['#a7abde', '#f5e8e1', '#f9f4f8', '#ced1f8', '#bcc0d3', '#e2e3f2'], '#a7abde'),
+  pastel('preset-enchanting-forest', 'Enchanting Forest', ['#c3dcd8', '#efd1d4', '#fbe8ed', '#dbd9da', '#c5bd96', '#93b0ac'], '#c3dcd8'),
+  pastel('preset-toned-down', 'Toned Down', ['#f5e8e1', '#e5d6cd', '#f7f2ef', '#dcc3b4', '#d2dae3', '#e8ebee'], '#dcc3b4'),
+  pastel('preset-smoothie-bar', 'Smoothie Bar', ['#ffd8d7', '#fff2f1', '#ffa7a6', '#ffdcdb', '#d4e0ee', '#b0c7e3'], '#ffa7a6'),
+  pastel('preset-blues', 'Blues', ['#eff3ff', '#bdd7e7', '#6baed6', '#3182bd', '#08519c'], '#6baed6'),
+  pastel('preset-cafe-mocha', 'Cafe Mocha', ['#f2e7db', '#dec4af', '#c0a189', '#9f7c63', '#735741', '#4b3727'], '#dec4af'),
+  pastel('preset-pastel-coffee-shop', 'Pastel Coffee Shop', ['#f2a6ab', '#c1dcc7', '#fbfae4', '#f4ceae', '#c1938a'], '#f2a6ab'),
 ];
 export const presetOf = (id) => PRESETS.find((p) => p.id === id) || null;
 

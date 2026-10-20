@@ -34,8 +34,13 @@ and setup, CHANGELOG.md for history.
   most one per `WHEEL_GAP_MS`). `glide` animates the change with the Web
   Animations API: the old panel (`.leaving`, clipped past the fixed hour
   axis / weekday row) and the new one move together by `travel` (a page or
-  one week row); only `MOVERS` move; `SETTLE` is a spring as CSS `linear()`.
-  `settings.motion` 'fade' fades instead.
+  one week row); only `MOVERS` move (with `will-change` while gliding). The
+  spring is baked into keyframes by `springFrames` (WebKit animates those
+  smoothly); a swipe passes `{ from, v }` so the glide sets off at the
+  finger's speed (`SWIPE_DAMPING`), and `render(true)` draws the agenda only
+  after `GLIDE_MS`. The wheel and buttons use `DAMPING` from rest; the user
+  loves how that feels on a PC, so leave it. `settings.motion` 'fade' fades
+  instead.
 - main.js `arrangeLabels` runs after each calendar render: moves task and
   deadline names in a day up or down (`translateY`) until none overlap each
   other or an event's text (the latter only within `NEAR_PX`), timed ones
@@ -80,15 +85,19 @@ and setup, CHANGELOG.md for history.
   stack; `--font-item` (item names, selector list under "Base") is the same
   for now. main.js re-renders on `document.fonts` `loadingdone`, since the
   Korean font only loads once Korean text shows.
-- Themes: `js/themes.js` (`PRESETS`: seven palette themes built by `preset`
-  from a palette's surfaces, accent and nine item colors; `cssVars`,
-  `applyTheme`), `js/theme-boot.js` (classic script in `<head>`: sets
+- Themes: `js/themes.js` (`PRESETS`: seven editor-palette themes built by
+  `preset` from a palette's surfaces, accent and nine item colors, and
+  fifteen light pastel ones built by `pastel` from five or six colors and an
+  accent: tinted surfaces, item colors keep their hues but take the
+  palette's softness and its own colors where close (`GELATO` holds Gelato
+  Days' fills and inks); `cssVars`, `applyTheme`), `js/theme-boot.js` (classic script in `<head>`: sets
   `data-theme` / the cached variables before first paint). `css/app.css` has
   Light on `:root` and Dark on `:root[data-theme="dark"]`; never use
   `prefers-color-scheme` in CSS. main.js `showTheme` / `chosenTheme`;
   `settings.theme` is per device ('system', 'light', 'dark', a preset id, or
-  'custom' / a saved theme id from the theme maker that 0.8.0 removed). The
-  user loves Light and Dark as they are: don't change them.
+  'custom' / a saved theme id from the theme maker that 0.8.0 removed). Light
+  and Dark are shown as "Gelato Days" and "Gelato Nights"; the user loves them
+  as they are: don't change them.
 - Working hours: `settings.workRanges` ([from, to] hours, any number);
   `workSpans` in settings.js sorts and joins them, timegrid.js `workBand`
   shades each.

@@ -236,7 +236,10 @@ function occurrencesIn(from, to) {
 
 const tasksIn = (from, to) => [...state.tasks.values()].filter((x) => x.due && x.due >= from && x.due < to);
 
-function render() {
+// `agendaLater`: a swipe on a touch screen draws the agenda once the dates
+// have glided into place, so the phone has nothing else to do meanwhile.
+let agendaTimer = 0;
+function render(agendaLater = false) {
   if (!store) return;
   const r = viewRange();
   const key = `${state.view}|${r.gridFrom || r.from}|${settings.weekStart}`;
@@ -249,7 +252,9 @@ function render() {
   applyLayout();
   const occs = occurrencesIn(isGrid() ? r.gridFrom : r.from, isGrid() ? r.gridTo : r.to);
   renderCalendar(r, rangeChanged, occs);
-  renderTasks(r, rangeChanged, isGrid() ? undefined : occs);
+  clearTimeout(agendaTimer);
+  if (agendaLater) agendaTimer = setTimeout(() => renderTasks(viewRange(), true), GLIDE_MS);
+  else renderTasks(r, rangeChanged, isGrid() ? undefined : occs);
   const dot = $('#sync-dot');
   dot.hidden = !(store.kind === 'cloud' && (state.pending || !navigator.onLine));
   dot.title = navigator.onLine ? 'Syncing…' : 'Offline — changes will sync later';
@@ -572,8 +577,9 @@ function keepThemeLook() {
 
 // ---------------------------------------------------------------- Navigation
 
-// `from`: how far a swipe has already dragged the dates, in pixels.
-function move(dir, from = 0) {
+// `swipe`: { from, v } when a finger has already dragged the dates `from`
+// pixels and let go moving at `v` pixels per ms.
+function move(dir, swipe = null) {
   const v = state.view;
   const old = takePanel();
   // A month view swiped by weeks moves on from the month it shows.
@@ -583,20 +589,20 @@ function move(dir, from = 0) {
     : v === 'week' ? addDays(base, 7 * dir)
       : v === '2week' ? addDays(base, 14 * dir)
         : addMonths(base, dir);
-  render();
-  glide(old, v === 'month' || v === '2week' ? 'y' : 'x', dir, 'page', from);
+  render(!!swipe);
+  glide(old, v === 'month' || v === '2week' ? 'y' : 'x', dir, 'page', swipe);
 }
 
 // The 2-week and month views move a week at a time when swiped.
-function shiftWeek(dir, from = 0) {
+function shiftWeek(dir, swipe = null) {
   const old = takePanel();
   if (state.view === 'month') {
     const r = viewRange();
     state.monthGrid = { from: addDays(r.gridFrom, 7 * dir), weeks: r.weeks };
   }
   state.date = addDays(state.date, 7 * dir);
-  render();
-  glide(old, 'y', dir, 'week', from);
+  render(!!swipe);
+  glide(old, 'y', dir, 'week', swipe);
 }
 
 // ---------------------------------------------------------------- Gliding between dates
@@ -605,21 +611,30 @@ function shiftWeek(dir, from = 0) {
 // the new ones come in right behind them, and settle into place with a little
 // spring. The hour labels and the month's weekday row stay where they are; a
 // week up or down in the month view moves by exactly one row, so the weeks
-// still on screen just glide up.
+// still on screen just glide up. After a swipe the glide sets off at the
+// finger's own speed, so letting go doesn't stop and restart the dates.
 const MOVERS = '.tg-grid > :not(.tg-corner, .tg-adlabel, .tg-axis), .mv-week, .tw-week';
 const GLIDE_MS = 520;
-const SETTLE = springEasing(0.86, GLIDE_MS);
+const DAMPING = 0.86; // the mouse wheel and buttons: settles after overshooting a hair
+const SWIPE_DAMPING = 0.9; // after a finger: a touch calmer
 
-// A spring as a CSS easing: `damping` 1 settles without overshooting, a bit
-// less overshoots a hair first. Older browsers get a plain ease-out.
-function springEasing(damping, ms) {
-  if (!CSS.supports?.('transition-timing-function', 'linear(0, 1)')) return 'cubic-bezier(0.2, 0.9, 0.25, 1)';
-  const w = 6.9 / (damping * (ms / 1000)); // settled to 0.1% by the end
+// A spring from `a` to `b` pixels along `axis`, as keyframes (phones animate
+// those as smoothly as computers do): `damping` 1 would settle without
+// overshooting, a bit less overshoots a hair first. `v` is the speed it sets
+// off at, in pixels per ms (0: from rest).
+function springFrames(axis, a, b, { ms = GLIDE_MS, damping = DAMPING, v = 0 } = {}) {
+  const T = ms / 1000;
+  const w = 6.9 / (damping * T); // settled to 0.1% by the end
   const wd = w * Math.sqrt(1 - damping * damping);
-  const at = (t) => 1 - Math.exp(-damping * w * t) * (Math.cos(wd * t) + ((damping * w) / wd) * Math.sin(wd * t));
+  // The finger's speed as a share of the way per second; never backwards, and
+  // not so fast that it shoots well past.
+  const v0 = b === a ? 0 : Math.min(Math.max((v * 1000) / (b - a), 0), w);
+  const at = (t) => 1 - Math.exp(-damping * w * t) * (Math.cos(wd * t) + ((damping * w - v0) / wd) * Math.sin(wd * t));
   const steps = 40;
-  const pts = Array.from({ length: steps + 1 }, (_, i) => (i === steps ? 1 : +at((i / steps) * (ms / 1000)).toFixed(4)));
-  return `linear(${pts.join(', ')})`;
+  return Array.from({ length: steps + 1 }, (_, i) => ({
+    offset: i / steps,
+    transform: `translate${axis.toUpperCase()}(${i === steps ? b : +(a + (b - a) * at((i / steps) * T)).toFixed(2)}px)`,
+  }));
 }
 
 // The dates on screen, to glide out of the way once new ones are drawn. A
@@ -641,7 +656,7 @@ function travel(panel, axis, unit) {
   return rows.length ? rows[rows.length - 1].offsetTop + rows[rows.length - 1].offsetHeight - rows[0].offsetTop : panel.clientHeight;
 }
 
-function glide(old, axis, dir, unit, from = 0) {
+function glide(old, axis, dir, unit, swipe = null) {
   const cal = $('#cal');
   const panel = cal?.firstElementChild;
   if (!old || !panel || old === panel) return;
@@ -657,12 +672,14 @@ function glide(old, axis, dir, unit, from = 0) {
   old.classList.add('leaving');
   panel.classList.add('gliding');
   cal.append(old);
-  const at = (v) => ({ transform: `translate${axis.toUpperCase()}(${v}px)` });
-  const opts = { duration: GLIDE_MS, easing: SETTLE };
+  const from = swipe?.from || 0;
+  const spring = { damping: swipe ? SWIPE_DAMPING : DAMPING, v: swipe?.v || 0 };
+  // Both move by the same amount at the same pace, so they stay joined.
+  const out = springFrames(axis, from, -dir * dist, spring);
+  const into = springFrames(axis, from + dir * dist, 0, spring);
   const runs = [
-    // Both move by the same amount, so they stay joined.
-    ...[...old.querySelectorAll(MOVERS)].map((el) => el.animate([at(from), at(-dir * dist)], { ...opts, fill: 'forwards' })),
-    ...[...panel.querySelectorAll(MOVERS)].map((el) => el.animate([at(from + dir * dist), at(0)], opts)),
+    ...[...old.querySelectorAll(MOVERS)].map((el) => el.animate(out, { duration: GLIDE_MS, fill: 'forwards' })),
+    ...[...panel.querySelectorAll(MOVERS)].map((el) => el.animate(into, GLIDE_MS)),
   ];
   Promise.allSettled(runs.map((a) => a.finished)).then(() => {
     old.remove();
@@ -1194,10 +1211,19 @@ let gestureUsed = false; // the touch became a selection or a move
 // they glide on to the next dates, otherwise they spring back.
 function wireSwipes() {
   let sw = null;
-  const drag = (s, d) => s.movers.forEach((el) => (el.style.transform = d ? `translate${s.axis.toUpperCase()}(${d}px)` : ''));
+  // 3D, so the phone moves the dates as layers instead of redrawing them.
+  const drag = (s, d) => s.movers.forEach((el) => (el.style.transform = d ? (s.axis === 'x' ? `translate3d(${d}px,0,0)` : `translate3d(0,${d}px,0)`) : ''));
+  // How fast the finger was going over its last moments, in px per ms.
+  const speedOf = (s) => {
+    const now = performance.now();
+    const recent = s.track.filter(([t]) => now - t < 100);
+    if (recent.length < 2) return 0;
+    const [[t0, d0], [t1, d1]] = [recent[0], recent[recent.length - 1]];
+    return t1 > t0 ? (d1 - d0) / (t1 - t0) : 0;
+  };
   const springBack = (s) => {
-    const at = (v) => ({ transform: `translate${s.axis.toUpperCase()}(${v}px)` });
-    const runs = s.movers.map((el) => el.animate([at(s.d), at(0)], { duration: 360, easing: SETTLE }));
+    const back = springFrames(s.axis, s.d, 0, { ms: 360, damping: SWIPE_DAMPING, v: speedOf(s) });
+    const runs = s.movers.map((el) => el.animate(back, 360));
     drag(s, 0);
     Promise.allSettled(runs.map((a) => a.finished)).then(() => s.panel.classList.remove('gliding'));
   };
@@ -1207,7 +1233,7 @@ function wireSwipes() {
     if (e.touches.length !== 1 || !e.target.closest('#cal')) return;
     const t = e.touches[0];
     const axis = state.view === 'day' || state.view === 'week' ? 'x' : 'y';
-    sw = { x: t.clientX, y: t.clientY, t: Date.now(), d: 0, axis, on: false };
+    sw = { x: t.clientX, y: t.clientY, t: Date.now(), d: 0, axis, on: false, track: [] };
   }, { passive: true });
   app.addEventListener('touchmove', (e) => {
     if (!sw) return;
@@ -1231,6 +1257,8 @@ function wireSwipes() {
       sw.panel.classList.add('gliding');
     }
     sw.d = sw.axis === 'x' ? dx : dy;
+    sw.track.push([performance.now(), sw.d]);
+    if (sw.track.length > 12) sw.track.shift();
     drag(sw, sw.d);
   }, { passive: true });
   app.addEventListener('touchend', () => {
@@ -1242,8 +1270,9 @@ function wireSwipes() {
     const speed = Math.abs(s.d) / Math.max(1, Date.now() - s.t); // px per ms
     if (Math.abs(s.d) < size * 0.25 && !(speed > 0.4 && Math.abs(s.d) > 30)) return springBack(s);
     const dir = s.d < 0 ? 1 : -1;
-    if (s.axis === 'x') move(dir, s.d);
-    else shiftWeek(dir, s.d);
+    const swipe = { from: s.d, v: speedOf(s) };
+    if (s.axis === 'x') move(dir, swipe);
+    else shiftWeek(dir, swipe);
   });
   app.addEventListener('touchcancel', () => {
     if (sw?.on) springBack(sw);

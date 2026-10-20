@@ -871,12 +871,17 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, pre
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
     f.elements.motion.value = settings.motion;
-    // System, then the light themes and the dark ones (Light and Dark first),
-    // and any made with an earlier version's theme maker.
+    // System, then the light themes (Gelato Days first), the pastel ones and
+    // the dark ones (Gelato Nights first), and any made with an earlier
+    // version's theme maker. Light and Dark are named for Gelato Days, the
+    // palette the app's colors came from.
     const opt = (v, text) => `<option value="${esc(v)}">${esc(text)}</option>`;
-    const group = (base, first) => `<optgroup label="${first}">${opt(base, first)}${presets.filter((p) => p.base === base).map((p) => opt(p.id, p.name)).join('')}</optgroup>`;
+    const list = (pick) => presets.filter(pick).map((p) => opt(p.id, p.name)).join('');
     const saved = [...themes().values()].sort((a, b) => a.name.localeCompare(b.name));
-    f.elements.theme.innerHTML = opt('system', 'System (light or dark, as this device is set)') + group('light', 'Light') + group('dark', 'Dark')
+    f.elements.theme.innerHTML = opt('system', 'System (Gelato Days or Gelato Nights, as this device is set)')
+      + `<optgroup label="Light">${opt('light', 'Gelato Days')}${list((p) => p.base === 'light' && !p.pastel)}</optgroup>`
+      + `<optgroup label="Pastel">${list((p) => p.pastel)}</optgroup>`
+      + `<optgroup label="Dark">${opt('dark', 'Gelato Nights')}${list((p) => p.base === 'dark')}</optgroup>`
       + (settings.customTheme || saved.length
         ? `<optgroup label="Made earlier">${settings.customTheme ? opt('custom', 'Custom (this device only)') : ''}${saved.map((t) => opt(t.id, t.name)).join('')}</optgroup>`
         : '');
