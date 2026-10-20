@@ -35,7 +35,8 @@ an app on a PC (Chrome) and an iPhone (Safari).
 - **Drag to move** events, deadlines and tasks to another time or day.
 - **Check off** tasks (tick box), deadlines (the flag) and events (the little
   symbol in front of the name: a check box, or a heart, star, book, beaker…
-  set per label or per event).
+  or none, set per label or per event).
+- **Tasks ⇄ deadlines:** turn a task into a deadline or back from its editor.
 - **Swipe** sideways through days and weeks, and up or down through the 2-week
   and month views a week at a time. On a PC the mouse wheel does the same over
   the calendar: tilt it (or hold Shift) for days and weeks, roll it for the

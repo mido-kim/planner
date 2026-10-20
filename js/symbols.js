@@ -3,7 +3,8 @@ import { esc } from './util.js';
 // The little symbol in front of an event's name: tap it to check the event
 // off (went, done, attended). Outline until then, filled in after. A label
 // can have a symbol for its events, and one event can have its own; without
-// either it's a square check box. A deadline's symbol is always its flag.
+// either it's a square check box. 'none' shows no symbol at all. A
+// deadline's symbol is always its flag.
 //
 // Checked events and deadlines keep the dates they were checked on in
 // `doneDates`, so each date of a repeating one is checked separately.
@@ -32,16 +33,18 @@ const SYM = {
   smile: ['Smile', '<circle class="s" cx="12" cy="12" r="8.5"/><path class="d" d="M9 10v.5M15 10v.5M8.5 14a4.5 4.5 0 0 0 7 0"/>'],
   bookmark: ['Bookmark', '<path class="s" d="M7 3.5h10v17l-5-3.6-5 3.6z"/>'],
   flag: ['Flag', '<path d="M5.5 21V4"/><path class="s" d="M5.5 4.5h11.5l-2.4 4.3 2.4 4.2H5.5z"/>'],
+  none: ['No symbol', '<circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/><path d="M7 17L17 7"/>'],
 };
 
-// Symbols to pick from, in order (the flag is for deadlines only).
-export const SYMBOLS = Object.keys(SYM).filter((k) => k !== 'flag');
+// Symbols to pick from, in order: none first (the flag is for deadlines only).
+export const SYMBOLS = ['none', ...Object.keys(SYM).filter((k) => k !== 'flag' && k !== 'none')];
 export const symbolName = (key) => SYM[key]?.[0] || 'Check box';
 
 export const symbolSvg = (key, size = 14) =>
   `<svg class="sym-svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${(SYM[key] || SYM.check)[1]}</svg>`;
 
-// The symbol an event shows: its own, its label's, or the check box.
+// The symbol an event shows: its own, its label's, or the check box; or
+// 'none'.
 export function symbolOf(ev, labels) {
   if (ev.kind === 'deadline') return 'flag';
   const own = SYM[ev.symbol] ? ev.symbol : null;
@@ -59,9 +62,10 @@ export function doneOps(ev, date, done) {
   return [{ op: 'put', coll: 'events', obj: { ...ev, doneDates: [...dates].sort(), updatedAt: Date.now() } }];
 }
 
-// The tappable symbol for an occurrence.
+// The tappable symbol for an occurrence (nothing for 'none').
 export function checkButton(occ, labels, size = 14) {
   const key = symbolOf(occ.ev, labels);
+  if (key === 'none') return '';
   const done = isDone(occ);
   const what = occ.ev.kind === 'deadline' ? 'Done' : symbolName(key);
   return `<button type="button" class="sym${done ? ' on' : ''}" data-check="${esc(occ.ev.id)}" data-date="${occ.date}" aria-pressed="${done}" aria-label="${what}" title="${done ? 'Checked off' : 'Check off'}">${symbolSvg(key, size)}</button>`;

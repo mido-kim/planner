@@ -65,10 +65,14 @@ function dayHead(d, cls, t, dom) {
   return `<button class="${c}" data-goto="${d}" aria-label="${fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })}${hol ? `, ${esc(hol)}` : ''}"${hol ? ` title="${esc(hol)}"` : ''}><span class="dow">${fmt(d, { weekday: 'short' })}</span><span class="dom">${dom}</span></button>`;
 }
 
-const hourText = (h, h24, short) => {
-  const hh = h % 24;
-  if (h24) return short ? pad(hh) : `${pad(hh)}:00`;
-  return short ? `${hh % 12 || 12}${hh < 12 ? 'a' : 'p'}` : `${hh % 12 || 12} ${hh < 12 ? 'AM' : 'PM'}`;
+// The hour column shows bare numbers: 7, 8 … 12, 1 (13, 14 … in 24-hour time).
+const hourText = (h, h24) => String(h24 ? h % 24 : h % 24 % 12 || 12);
+
+// A time as bare as that: 10, 2:30 (14:30 in 24-hour time).
+const bareTime = (min, h24) => {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${h24 ? h : h % 12 || 12}${m ? `:${pad(m)}` : ''}`;
 };
 
 // Sorts out what goes where for `days`: per day, the event pieces on the
@@ -278,7 +282,7 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
   const axis = [];
   for (let h = Math.ceil(settings.dayStart / 3) * 3; h < settings.dayEnd; h += 3) {
     if (h * 60 - H0 < 60 || H1 - h * 60 < 60) continue;
-    axis.push(`<span style="top:${(h * 60 - H0) * pct}%">${hourText(h, h24, true)}</span>`);
+    axis.push(`<span style="top:${(h * 60 - H0) * pct}%">${hourText(h, h24)}</span>`);
   }
 
   const weeks = [days.slice(0, 7), days.slice(7, 14)].map((week, w) => {
@@ -404,7 +408,8 @@ function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX, labels = new Map()
   return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}">${body}</div>`;
 }
 
-// In the 2-week view an event is a small block with just its title.
+// In the 2-week view an event is a small block with its title and start time
+// (on the next line when the title fills the first).
 function miniBlock(seg, H0, pct, h24, color, labels) {
   const { occ } = seg;
   const ev = occ.ev;
@@ -412,5 +417,5 @@ function miniBlock(seg, H0, pct, h24, color, labels) {
   const time = fmtTimeRange(minOf(occ.start), minOf(occ.end), h24);
   const cls = ['ev', 'mini', `c-${color}`, ev.tentative && 'tent', seg.contTop && 'ct', seg.contBottom && 'cb'].filter(Boolean).join(' ');
   const style = `top:${(seg.va - H0) * pct}%;height:${(seg.vb - seg.va) * pct}%;${across(seg)}`;
-  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}"><span class="ev-t">${checkButton(occ, labels, 9)}${title}</span></div>`;
+  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}"><span class="ev-t">${checkButton(occ, labels, 9)}${title}</span><span class="ev-m">${bareTime(minOf(occ.start), h24)}</span></div>`;
 }

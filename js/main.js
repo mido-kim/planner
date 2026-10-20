@@ -8,7 +8,7 @@ import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, taskEd
 import { icons } from './icons.js';
 import { deleteLabelOps, labelUsage, setLabelStatusOps } from './labels.js';
 import { expand, spanDays } from './recurrence.js';
-import { deleteOps, isRepeating, masterOf, moveOps, saveOps } from './series.js';
+import { deadlineToTaskOps, deleteOps, isRepeating, masterOf, moveOps, saveOps, taskToDeadlineOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
 import { doneOps } from './symbols.js';
@@ -421,6 +421,7 @@ async function openNewEvent(over) {
   const initial = { kind: 'event', title: '', notes: '', color: 'blue', labelId: null, shape: 'block', tentative: false, allDay: false, rrule: null, ...over };
   const res = await eventEditor({ initial, isNew: true, repeating: false, ...editorOptions() });
   if (res?.action === 'save') commit(saveOps(state.events, null, null, res.form, null));
+  else if (res?.action === 'toTask') commit(deadlineToTaskOps(state.events, null, null, res.form));
 }
 
 // A new timed event on `date`; without times, the next whole hour today or
@@ -448,6 +449,7 @@ async function newTask(due, dueMin = null) {
   const task = { id: uid(), title: '', notes: '', due: due || null, dueTime: due && dueMin != null ? timeValue(dueMin) : null, labelId: null, color: null, done: false, doneAt: null, createdAt: now, updatedAt: now };
   const res = await taskEditor(task, { isNew: true, ...editorOptions() });
   if (res?.action === 'save') commit([{ op: 'put', coll: 'tasks', obj: { ...task, ...res.fields, doneAt: res.fields.done ? now : null } }]);
+  else if (res?.action === 'toDeadline') commit(taskToDeadlineOps(null, res.fields, today()));
 }
 
 async function editEventAt(id, date) {
@@ -461,6 +463,7 @@ async function editEventAt(id, date) {
   if (!res) return;
   const what = ev.kind === 'deadline' ? 'Deadline' : 'Event';
   if (res.action === 'save') commit(saveOps(state.events, ev, date, res.form, res.scope));
+  else if (res.action === 'toTask') commit(deadlineToTaskOps(state.events, ev, date, res.form), 'Turned into a task');
   else commit(deleteOps(state.events, ev, date, res.scope), res.scope && res.scope !== 'this' ? `${what}s deleted` : `${what} deleted`);
 }
 
@@ -488,6 +491,7 @@ async function editTask(id) {
     const doneAt = res.fields.done ? t.doneAt || Date.now() : null;
     commit([{ op: 'put', coll: 'tasks', obj: { ...t, ...res.fields, doneAt, updatedAt: Date.now() } }]);
   } else if (res?.action === 'delete') commit([{ op: 'remove', coll: 'tasks', id }], 'Task deleted');
+  else if (res?.action === 'toDeadline') commit(taskToDeadlineOps(t, res.fields, today()), 'Turned into a deadline');
 }
 
 // ---------------------------------------------------------------- Labels

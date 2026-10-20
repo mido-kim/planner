@@ -1,4 +1,4 @@
-import { absMin, addDays, dateOf, diffDays, fromAbsMin, shiftDays, weekday } from './dates.js';
+import { absMin, addDays, dateOf, diffDays, dt, fromAbsMin, minOf, parseTime, shiftDays, timeValue, weekday } from './dates.js';
 import { alignStart, occurrenceDates } from './recurrence.js';
 import { uid } from './util.js';
 
@@ -160,4 +160,36 @@ export function moveOps(events, ev, date, minutes, scope) {
     rrule = { ...rrule, byWeekday: from.map((d) => (((d + days) % 7) + 7) % 7) };
   }
   return saveOps(events, ev, date, { start: shift(start), end: shift(end), rrule }, scope);
+}
+
+// ---------------------------------------------------------------- Tasks ⇄ deadlines
+
+// A task turned into a deadline (or a new one, without `task`), keeping its
+// name, notes, label, color, date and time, and whether it's done. A task
+// without a date is due `day`.
+export function taskToDeadlineOps(task, fields, day) {
+  const now = Date.now();
+  const due = fields.due || day;
+  const start = fields.dueTime ? dt(due, parseTime(fields.dueTime)) : due;
+  const deadline = {
+    id: uid(), kind: 'deadline', title: fields.title, notes: fields.notes || '', labelId: fields.labelId || null,
+    // A task with no color shows gray; a deadline needs one.
+    color: fields.color || (fields.labelId ? null : 'gray'),
+    shape: 'block', symbol: null, tentative: false, allDay: !fields.dueTime, start, end: start,
+    rrule: null, exdates: [], doneDates: fields.done ? [due] : [], seriesId: null, originalDate: null, createdAt: now, updatedAt: now,
+  };
+  return [put(deadline), ...(task ? [{ op: 'remove', coll: 'tasks', id: task.id }] : [])];
+}
+
+// A deadline (just the occurrence on `date`, if it repeats) turned into a
+// task, from the editor's `form`; `ev` is null for one not saved yet.
+export function deadlineToTaskOps(events, ev, date, form) {
+  const now = Date.now();
+  const done = !!ev?.doneDates?.includes(date);
+  const task = {
+    id: uid(), title: form.title, notes: form.notes || '', due: dateOf(form.start), dueTime: form.allDay ? null : timeValue(minOf(form.start)),
+    labelId: form.labelId || null, color: form.color || null, done, doneAt: done ? now : null, createdAt: now, updatedAt: now,
+  };
+  const gone = ev ? deleteOps(events, ev, date, isRepeating(events, ev) ? 'this' : null) : [];
+  return [...gone, { op: 'put', coll: 'tasks', obj: task }];
 }

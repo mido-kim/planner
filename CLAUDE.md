@@ -52,7 +52,9 @@ and setup, CHANGELOG.md for history.
   `k` in each SVG, styled in css under `.sym`), `symbolOf` (event's own, its
   label's, else 'check'; deadlines 'flag'), `isDone`, `doneOps`,
   `checkButton` (used by every view; main.js handles `[data-check]` clicks).
-  series.js carries `doneDates` along like `exdates`.
+  'none' shows nothing. series.js carries `doneDates` along like `exdates`,
+  and has `taskToDeadlineOps` / `deadlineToTaskOps` (one date of a repeating
+  deadline becomes a task).
 - `js/recurrence.js`: repeat rules: `occurrenceDates`, `expand`,
   `describeRule`, `toRRule`. `js/series.js`: this/following/all edits and
   deletes, returned as write ops.

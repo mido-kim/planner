@@ -3,6 +3,18 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.7.1 (2026-10-20)
+
+- "No symbol" is a choice in every symbol picker (labels and events), for
+  events that don't need checking off, like trips across several days.
+- The 2-week view writes each event's start time in its box, after its name
+  (on the next line when the name fills the first).
+- The hour column on the left shows just numbers: 7, 8 … 12, 1.
+- Tasks and deadlines can turn into each other: "Turn into a deadline" in a
+  task, "Turn into a task" in a deadline. Name, notes, label, color, date,
+  time and done state come along (a task without a date becomes due today).
+  For a repeating deadline only that date turns into a task. Undo is offered.
+
 ## 0.7.0 (2026-10-20)
 
 - Deadlines can be checked off like tasks: tap the flag. It fills in, the

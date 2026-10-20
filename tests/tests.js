@@ -2,7 +2,7 @@ import { backupFile, icsFile, parseBackup } from '../js/backup.js';
 import { addDays, diffDays, fmtTimeRange, weekday } from '../js/dates.js';
 import { activeLabels, colorOf, deleteLabelOps, labelUsage, retiredLabels, setLabelStatusOps } from '../js/labels.js';
 import { alignStart, describeRule, expand, occurrenceDates, toRRule } from '../js/recurrence.js';
-import { deleteOps, moveOps, saveOps } from '../js/series.js';
+import { deadlineToTaskOps, deleteOps, moveOps, saveOps, taskToDeadlineOps } from '../js/series.js';
 import { HOLIDAYS } from '../js/holidays.js';
 import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
@@ -430,6 +430,30 @@ test('agenda: a checked-off deadline is left out until asked for', () => {
   const occs = expand({ ...deadline, doneDates: ['2026-10-14'] }, '2026-10-14', '2026-10-15');
   const g = agendaGroups({ from: '2026-10-14', to: '2026-10-15', occs, tasks: [], showPast: false, t: '2026-10-14', now: '2026-10-14T09:00' });
   eq([g.groups.length, g.hidden], [0, 1]);
+});
+
+// ---- tasks ⇄ deadlines
+test('a task turns into a deadline with its date, time, label and done state, and back', () => {
+  const task = { id: 't1', title: 'Send slides', notes: 'n', due: '2026-10-14', dueTime: '17:00', labelId: 'L', color: null, done: true };
+  const ops = taskToDeadlineOps(task, task, '2026-10-01');
+  const [d] = puts(ops);
+  eq([d.kind, d.start, d.end, d.allDay, d.labelId, d.color, d.doneDates], ['deadline', '2026-10-14T17:00', '2026-10-14T17:00', false, 'L', null, ['2026-10-14']]);
+  eq(ops.find((o) => o.op === 'remove'), { op: 'remove', coll: 'tasks', id: 't1' });
+  // Without a date it's due today; without a time, any time that day; without a color or label, gray.
+  const [d2] = puts(taskToDeadlineOps(null, { title: 'X', due: null, dueTime: null, labelId: null, color: null, done: false }, '2026-10-20'));
+  eq([d2.start, d2.allDay, d2.color, d2.doneDates], ['2026-10-20', true, 'gray', []]);
+  // Back: the deadline goes and a task with the same date and time comes.
+  const back = deadlineToTaskOps(map(d), d, '2026-10-14', d);
+  eq(removes(back), [d.id]);
+  const t = back.find((o) => o.coll === 'tasks').obj;
+  eq([t.due, t.dueTime, t.labelId, t.done], ['2026-10-14', '17:00', 'L', true]);
+});
+test('one date of a repeating deadline turns into a task; the rest keep repeating', () => {
+  const rep = { ...deadline, rrule: { freq: 'weekly', interval: 1, byWeekday: [3], until: null, count: null } };
+  const ops = deadlineToTaskOps(map(rep), rep, '2026-10-21', { ...rep, start: '2026-10-21T17:00' });
+  const [series] = puts(ops).filter((o) => o.kind === 'deadline');
+  eq(series.exdates, ['2026-10-21']);
+  eq(ops.find((o) => o.coll === 'tasks').obj.due, '2026-10-21');
 });
 
 // ---- themes and their backups

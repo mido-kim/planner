@@ -151,8 +151,9 @@ const clampInt = (v, lo, hi) => Math.min(hi, Math.max(lo, Math.round(+v) || lo))
 
 // ---------------------------------------------------------------- Event editor
 
-// Resolves with { action: 'save', form, scope } or { action: 'delete', scope },
-// or null if cancelled. `scope` is null unless the event repeats.
+// Resolves with { action: 'save', form, scope }, { action: 'delete', scope }
+// or { action: 'toTask', form } (a deadline turned into a task), or null if
+// cancelled. `scope` is null unless the event repeats.
 export function eventEditor({ initial, isNew, repeating, settings, labels, manageLabels }) {
   const order = [0, 1, 2, 3, 4, 5, 6].map((i) => (i + settings.weekStart) % 7);
   const html = `
@@ -195,6 +196,7 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
     </div>
     <div class="dlg-foot">
       ${isNew ? '' : '<button type="button" class="btn danger-text" data-delete>Delete</button>'}
+      <button type="button" class="btn dl-only" data-convert>Turn into a task</button>
       <span class="spacer"></span>
       <button type="button" class="btn" data-cancel>Cancel</button>
       <button type="submit" class="btn primary">Save</button>
@@ -465,6 +467,11 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
       }
       finish({ action: 'delete', scope });
     });
+    // Only this date of a repeating deadline becomes a task.
+    f.querySelector('[data-convert]').addEventListener('click', () => {
+      const form = collect();
+      if (form) finish({ action: 'toTask', form });
+    });
 
     if (isNew) setTimeout(() => el('title').focus(), 50);
   });
@@ -509,7 +516,7 @@ export function taskEditor(task, { isNew = false, labels, manageLabels }) {
     <div class="dlg-body">
       ${isNew ? '' : '<label class="field-row toggle-row"><span class="lbl">Done</span><input type="checkbox" name="done" class="switch"></label>'}
       ${fieldRow('Due', `<input type="date" name="due"><input type="time" name="dueTime" class="time">${clearTime('dueTime', 'No time')}`, 'dt-row')}
-      <p class="hint">With a date it shows on the calendar: at its time, or at the end of the day without one. Leave the date empty to keep it under “No date”.</p>
+      <p class="hint">With a date it shows on the calendar: at its time, or around midnight without one. Leave the date empty to keep it under “No date”.</p>
       ${fieldRow('Label', '<div class="label-pills"></div>', 'label-row')}
       ${fieldRow('Color', swatches(['none', ...COLORS]))}
       <textarea name="notes" rows="4" placeholder="Notes" aria-label="Notes"></textarea>
@@ -517,6 +524,7 @@ export function taskEditor(task, { isNew = false, labels, manageLabels }) {
     </div>
     <div class="dlg-foot">
       ${isNew ? '' : '<button type="button" class="btn danger-text" data-delete>Delete</button>'}
+      <button type="button" class="btn" data-convert>Turn into a deadline</button>
       <span class="spacer"></span>
       <button type="button" class="btn" data-cancel>Cancel</button>
       <button type="submit" class="btn primary">${isNew ? 'Add task' : 'Save'}</button>
@@ -544,30 +552,35 @@ export function taskEditor(task, { isNew = false, labels, manageLabels }) {
       },
     });
     sync();
-    f.addEventListener('submit', (e) => {
-      e.preventDefault();
+    const fields = () => {
       const title = f.elements.title.value.trim();
       if (!title) {
         const p = f.querySelector('.form-error');
         p.textContent = 'Give the task a name.';
         p.hidden = false;
-        return;
+        return null;
       }
       const due = f.elements.due.value || null;
-      finish({
-        action: 'save',
-        fields: {
-          title,
-          done: f.elements.done ? f.elements.done.checked : false,
-          due,
-          dueTime: due ? f.elements.dueTime.value || null : null,
-          labelId: f.elements.label.value || null,
-          color: pickedColor(f, labels, null),
-          notes: f.elements.notes.value.trim(),
-        },
-      });
+      return {
+        title,
+        done: f.elements.done ? f.elements.done.checked : false,
+        due,
+        dueTime: due ? f.elements.dueTime.value || null : null,
+        labelId: f.elements.label.value || null,
+        color: pickedColor(f, labels, null),
+        notes: f.elements.notes.value.trim(),
+      };
+    };
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = fields();
+      if (v) finish({ action: 'save', fields: v });
     });
     f.querySelector('[data-delete]')?.addEventListener('click', () => finish({ action: 'delete' }));
+    f.querySelector('[data-convert]').addEventListener('click', () => {
+      const v = fields();
+      if (v) finish({ action: 'toDeadline', fields: v });
+    });
     if (isNew) setTimeout(() => f.elements.title.focus(), 50);
   });
 }
