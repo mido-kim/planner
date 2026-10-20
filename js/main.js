@@ -52,8 +52,10 @@ boot();
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   wireEvents();
-  // Text widths change once the web font arrives, so cut text is checked again.
+  // Text widths change once a web font arrives (the Korean one loads when
+  // Korean text first shows), so the calendar is laid out again.
   document.fonts?.ready.then(() => store && fitText(app));
+  document.fonts?.addEventListener('loadingdone', () => store && !sel && !mv && render());
   const params = new URLSearchParams(location.search);
   if (params.has('demo')) return startDemo(params);
   if (!firebaseConfig) return start(localStore());

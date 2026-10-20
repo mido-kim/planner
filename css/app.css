@@ -16,6 +16,22 @@
   font-style: italic;
   font-display: swap;
 }
+/* 느좋체 (Neujot) for Korean letters only; it loads the first time Korean
+   text shows. */
+@font-face {
+  font-family: "Neujot";
+  src: url("../fonts/Neujot-Regular.woff") format("woff");
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+1100-11FF, U+3131-318E, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
+}
+@font-face {
+  font-family: "Neujot";
+  src: url("../fonts/Neujot-Bold.woff") format("woff");
+  font-weight: 700;
+  font-display: swap;
+  unicode-range: U+1100-11FF, U+3131-318E, U+A960-A97F, U+AC00-D7A3, U+D7B0-D7FF;
+}
 
 /* "Gelato Days" pastels: #FFCBE1 #D6E5BD #F9E1A8 #BCD8EC #DCCCEC #FFDAB4,
    plus mint, coral and stone mixed to match. Each item color has a pastel
@@ -67,12 +83,11 @@
   --ink-purple: #6243a0;
   --ink-gray: #5e5853;
 
-  /* Instrument Serif for the app itself (titles, buttons, dates, labels);
-     Arial for the names of events, deadlines and tasks, and what you type for
-     them. Neither has Korean letters, which come from Apple SD Gothic Neo
-     (iPhone) or Malgun Gothic (Windows). */
-  --font-ui: "Instrument Serif", Georgia, "Apple SD Gothic Neo", "Malgun Gothic", serif;
-  --font-item: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  /* Everything in Instrument Serif, Korean letters in 느좋체 (Neujot): the
+     app's own text and the names of events, deadlines and tasks alike.
+     --font-item is kept separate so names can get their own font again. */
+  --font-ui: "Instrument Serif", "Neujot", Georgia, "Apple SD Gothic Neo", "Malgun Gothic", serif;
+  --font-item: var(--font-ui);
   font-family: var(--font-ui);
   font-synthesis: none;
   font-size: 14px;

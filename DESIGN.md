@@ -31,14 +31,15 @@ touch the code.
     the text color on each event color.
   - *Size*: PC and Phone modes (`layout/hour-height` = how tall an hour is,
     `layout/hour-column-width`, `radius/event`, …).
-- **Fonts in the app:** Instrument Serif (regular and italic, no bold) for the
-  app's own text; Arial for the names of events, deadlines and tasks. Korean
-  comes from Apple SD Gothic Neo (iPhone) or Malgun Gothic (Windows).
-- **Text styles** match: the app's own text uses Instrument Serif (Title/Range
-  25, Title/Panel 22, Calendar/Date 20, Calendar/Weekday, Calendar/Hour label,
-  Event/Time, Body/Medium, Label, Caption, Section header, Badge). The item-name
-  styles (Event/Title, Chip, Body, Title/Dialog) use Arimo, which has Arial's
-  letter widths (Figma's connector can't use Arial itself).
+- **Fonts in the app:** Instrument Serif (regular and italic, no bold) for all
+  English letters and numbers, the names of events, deadlines and tasks
+  included; 느좋체 (regular and bold) for Korean letters.
+- **Text styles** match: every style uses Instrument Serif (Title/Range 25,
+  Title/Panel 22, Calendar/Date 20, Calendar/Weekday, Calendar/Hour label,
+  Event/Time, Body/Medium, Label, Caption, Section header, Badge, and the
+  item-name styles Event/Title, Chip, Body, Title/Dialog). Figma's connector
+  can't use 느좋체, so Korean text in the file shows in Figma's own Korean
+  font; install 느좋체 on your PC to see it there.
 
 Not drawn in Figma yet: the day view, the scope dialog (this / following /
 all) and dark mode screens (the variables have Dark values, so a frame can
@@ -88,8 +89,8 @@ Figma's free "Figma Design for beginners" course covers all of these.
 - **Not designable:** the iPhone date/time picker wheels and dropdown menus
   are drawn by iOS. The fields that open them can be styled, and custom
   pickers can be built if you want full control (extra work).
-- **Fonts:** the app uses Arial, which every iPhone and PC has. Korean
-  letters come from Apple SD Gothic Neo (iPhone) or Malgun Gothic (Windows).
+- **Fonts:** the app carries its own fonts (Instrument Serif and 느좋체 in
+  `fonts/`), so iPhone and PC show the same letters.
 - **Hour height** isn't a setting any more: the day and week views share the
   screen's height among the hours, so a block's size in a frame shows that
   screen only.

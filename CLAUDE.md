@@ -53,9 +53,12 @@ and setup, CHANGELOG.md for history.
   Colors are the "Gelato Days" pastels: each item color class sets `--c`
   (pastel), `--ci` (ink for text), `--cl` (mid tone for lines and dots) and
   `--cf` (block fill). The accent is pink (`--accent`, `--accent-strong`,
-  `--accent-ink`). Fonts: `--font-ui` (Instrument Serif, `fonts/*.woff`, one
-  weight, `font-synthesis: none`) for everything except item names, which use
-  `--font-item` (Arial; selector list under "Base").
+  `--accent-ink`). Fonts: Instrument Serif for all Latin text (one weight,
+  `font-synthesis: none`) and 느좋체 "Neujot" (Pretendard-based, OFL; regular
+  and bold, subset to Hangul, `unicode-range`) for Korean. `--font-ui` is the
+  stack; `--font-item` (item names, selector list under "Base") is the same
+  for now. main.js re-renders on `document.fonts` `loadingdone`, since the
+  Korean font only loads once Korean text shows.
 - `sw.js`: offline cache. **Add any new file to `SHELL`.**
 - `js/demo.js`: design preview (`?demo`), in-memory sample data. DESIGN.md has
   the Figma workflow, layer names and the URL options.
@@ -67,8 +70,8 @@ the source of truth for design values: each one's WEB code syntax names the
 CSS custom property it maps to (`var(--bg)`, `var(--hh)`, `var(--radius-event)`,
 `var(--ink-blue)`, …). Use those exact names in `css/app.css`; some don't exist
 in the CSS yet. Figma gotchas met so far: SF Pro can't be used for instance
-text, and Arial isn't available to the Figma connector, so text styles use
-Arimo (Arial's metrics); paint opacity on variable-bound fills resets inside
+text; the Figma connector can't use Arial, Pretendard or 느좋체 (all text
+styles are Instrument Serif; Korean shows in Figma's fallback); paint opacity on variable-bound fills resets inside
 frames with explicit variable modes, so tints are separate layers with layer
 opacity. The screens were copied from the live app (?demo, 0.5.5) by script into
 instances of the components; event positions there are fixed, not from data.

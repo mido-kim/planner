@@ -53,9 +53,10 @@ http://localhost:5173/tests/.
 
 ## Use a different font
 
-The app uses Instrument Serif (in `fonts/`) for its own text and Arial for
-the names of events, deadlines and tasks (`--font-ui` and `--font-item` in
-`css/app.css`). To use another font you downloaded:
+The app uses Instrument Serif for English letters and numbers and 느좋체 for
+Korean letters, everywhere, item names included (both in `fonts/`;
+`--font-ui` and `--font-item` in `css/app.css`). To use another font you
+downloaded:
 
 1. Check its license allows use on a website ("web font" or OFL; most free
    Korean fonts such as Pretendard and Nanum do).

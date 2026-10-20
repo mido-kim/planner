@@ -3,6 +3,15 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.5.7 (2026-10-20)
+
+- New fonts: Korean letters are in 느좋체 everywhere, and all English letters
+  and numbers are in Instrument Serif, the names of events, deadlines and
+  tasks included (they were Arial). Instrument Serif has no bold, so English
+  names are now regular weight; Korean names keep their bold.
+- The Korean font (about 0.9 MB per weight) is saved for offline use in the
+  background, once.
+
 ## 0.5.6 (2026-10-17)
 
 - Task and deadline names are back on one line: a long name is cut and faded

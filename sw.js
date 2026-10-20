@@ -31,6 +31,8 @@ const SHELL = [
   'js/views/timegrid.js',
   'fonts/InstrumentSerif-Regular.woff',
   'fonts/InstrumentSerif-Italic.woff',
+  'fonts/Neujot-Regular.woff',
+  'fonts/Neujot-Bold.woff',
   'icons/icon.svg',
   'icons/icon-180.png',
   'icons/icon-192.png',
