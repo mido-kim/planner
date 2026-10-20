@@ -2,6 +2,7 @@ import { absMin, addDays, dateOf, diffDays, dt, fmt, fromAbsMin, minOf, parseTim
 import { icons } from './icons.js';
 import { activeLabels, isRetired, retiredLabels, usageText } from './labels.js';
 import { describeRule, inLastWeekOfMonth, nthOf, ORDINALS, ruleKey, spanDays, WEEKDAYS, WEEKDAYS_SHORT } from './recurrence.js';
+import { SYMBOLS, symbolName, symbolSvg } from './symbols.js';
 import { AMOUNTS, hexToHsl, hslToHex, PARTS } from './themes.js';
 import { COLORS, esc } from './util.js';
 import { VERSION } from './version.js';
@@ -35,6 +36,10 @@ function run(className, html, setup, { backdropCloses = false } = {}) {
 
 const fieldRow = (label, control, cls = '') =>
   `<div class="field-row ${cls}"><span class="lbl">${label}</span><div class="ctl">${control}</div></div>`;
+
+// Symbols to pick from (see symbols.js), after an optional first choice.
+const symbolPicks = (name, first = '') =>
+  `<div class="sym-pick" role="radiogroup" aria-label="Symbol">${first}${SYMBOLS.map((k) => `<label class="sym-opt" title="${symbolName(k)}"><input type="radio" name="${name}" value="${k}" aria-label="${symbolName(k)}"><span>${symbolSvg(k, 18)}</span></label>`).join('')}</div>`;
 
 const swatches = (colors, name = 'color') =>
   `<div class="swatches">${colors.map((c) => `<label class="swatch c-${c}" title="${c === 'none' ? 'No color' : c}"><input type="radio" name="${name}" value="${c}"><span></span></label>`).join('')}</div>`;
@@ -184,6 +189,7 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
         </div>`, 'shape-row')}
       ${fieldRow('Label', '<div class="label-pills"></div>', 'label-row')}
       ${fieldRow('Color', swatches(COLORS))}
+      ${fieldRow('Symbol', symbolPicks('symbol', '<label class="sym-opt follow"><input type="radio" name="symbol" value=""><span></span></label>'), 'ev-only sym-row')}
       <textarea name="notes" rows="3" placeholder="Notes" aria-label="Notes"></textarea>
       <p class="form-error" role="alert" hidden></p>
     </div>
@@ -293,6 +299,15 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
     fillRepeat();
     updateRepeatUI();
 
+    // The symbol tapped to check the event off: its label's, unless it has
+    // its own.
+    const drawFollow = () => {
+      const label = labels().get(f.elements.label?.value);
+      const key = SYMBOLS.includes(label?.symbol) ? label.symbol : 'check';
+      f.querySelector('.sym-opt.follow span').innerHTML = `${symbolSvg(key, 18)}${label ? 'Same as label' : 'Default'}`;
+    };
+    if (!check(f, 'symbol', initial.symbol || '')) check(f, 'symbol', '');
+
     setupLabelPicker(f, {
       labels,
       labelId: initial.labelId,
@@ -300,8 +315,10 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
       onPick: (label, redrawn) => {
         if (label && !redrawn) check(f, 'color', label.color);
         updateKindUI();
+        drawFollow();
       },
     });
+    drawFollow();
     f.addEventListener('change', (e) => {
       // An event needs times: one made from a deadline with no time gets 9–10 AM.
       if (e.target.name === 'kind' && !isDeadline() && !el('startTime').value) {
@@ -418,6 +435,7 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
         labelId: f.elements.label.value || null,
         color: pickedColor(f, labels, 'blue'),
         shape: kind === 'event' ? f.elements.shape.value : 'block',
+        symbol: kind === 'event' ? f.elements.symbol.value || null : null,
         tentative: kind === 'event' && el('tentative').checked,
         allDay,
         start,
@@ -570,7 +588,9 @@ export function labelsDialog({ getLabels, usage, act, bindRefresh }) {
         <input name="newName" placeholder="New label" maxlength="40" autocomplete="off" aria-label="New label name">
         <button type="submit" class="btn primary">Add</button>
         ${swatches(COLORS, 'newColor')}
+        ${symbolPicks('newSymbol')}
       </div>
+      <p class="hint">The symbol goes in front of its events; tap it on an event to check it off.</p>
       <p class="form-error" role="alert" hidden></p>
       <section>
         <h3>Active</h3>
@@ -588,6 +608,7 @@ export function labelsDialog({ getLabels, usage, act, bindRefresh }) {
     const err = f.querySelector('.form-error');
     let editing = null;
     check(f, 'newColor', COLORS[getLabels().size % COLORS.length]);
+    check(f, 'newSymbol', 'check');
 
     const fail = (msg) => {
       err.textContent = msg;
@@ -610,12 +631,13 @@ export function labelsDialog({ getLabels, usage, act, bindRefresh }) {
           <button type="button" class="btn primary sm" data-do="save">Save</button>
           <button type="button" class="btn sm" data-do="cancel">Cancel</button>
           ${swatches(COLORS, 'editColor')}
+          ${symbolPicks('editSymbol')}
         </li>`;
       }
       const buttons = isRetired(l)
         ? '<button type="button" class="btn sm" data-do="restore">Restore</button><button type="button" class="btn sm danger-text" data-do="delete">Delete…</button>'
         : `<button type="button" class="icon-btn sm" data-do="edit" aria-label="Rename or recolor">${icons.pencil}</button><button type="button" class="btn sm" data-do="remove">Remove…</button>`;
-      return `<li class="lrow c-${l.color}${isRetired(l) ? ' retired' : ''}" data-id="${esc(l.id)}"><i class="ldot"></i><span class="lname">${esc(l.name)}<span class="lcount">${count}</span></span>${buttons}</li>`;
+      return `<li class="lrow c-${l.color}${isRetired(l) ? ' retired' : ''}" data-id="${esc(l.id)}"><i class="ldot">${symbolSvg(SYMBOLS.includes(l.symbol) ? l.symbol : 'check', 16)}</i><span class="lname">${esc(l.name)}<span class="lcount">${count}</span></span>${buttons}</li>`;
     };
     const draw = () => {
       const all = getLabels();
@@ -626,6 +648,7 @@ export function labelsDialog({ getLabels, usage, act, bindRefresh }) {
       const e = editing && all.get(editing);
       if (e) {
         check(f, 'editColor', e.color);
+        if (!check(f, 'editSymbol', e.symbol || 'check')) check(f, 'editSymbol', 'check');
         f.elements.editName.focus();
       }
     };
@@ -637,16 +660,17 @@ export function labelsDialog({ getLabels, usage, act, bindRefresh }) {
       if (document.activeElement?.name === 'editName') return save(document.activeElement.closest('[data-id]').dataset.id);
       const name = f.elements.newName.value.trim();
       if (!nameOk(name)) return;
-      await act('add', { name, color: f.elements.newColor.value || 'blue' });
+      await act('add', { name, color: f.elements.newColor.value || 'blue', symbol: f.elements.newSymbol.value || 'check' });
       f.elements.newName.value = '';
       check(f, 'newColor', COLORS[getLabels().size % COLORS.length]);
+      check(f, 'newSymbol', 'check');
       draw();
     });
 
     const save = async (id) => {
       const name = f.elements.editName.value.trim();
       if (!nameOk(name, id)) return;
-      await act('update', { id, name, color: f.elements.editColor.value });
+      await act('update', { id, name, color: f.elements.editColor.value, symbol: f.elements.editSymbol.value || 'check' });
       editing = null;
       draw();
     };

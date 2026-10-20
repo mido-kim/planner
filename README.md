@@ -33,6 +33,9 @@ an app on a PC (Chrome) and an iPhone (Safari).
   theme to save it to your account for all your devices; each device picks
   its own.
 - **Drag to move** events, deadlines and tasks to another time or day.
+- **Check off** tasks (tick box), deadlines (the flag) and events (the little
+  symbol in front of the name: a check box, or a heart, star, book, beaker…
+  set per label or per event).
 - **Swipe** sideways through days and weeks, and up or down through the 2-week
   and month views a week at a time. On a PC the mouse wheel does the same over
   the calendar: tilt it (or hold Shift) for days and weeks, roll it for the

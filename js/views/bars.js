@@ -34,14 +34,15 @@ export function layoutBars(items, days) {
   return { segs, lanes: laneEnds.length, used };
 }
 
-// One bar. `top` is a CSS length; `label` is HTML. The shape is the event's
-// choice: a filled block, a line with arrowheads at both ends, or a plain line.
-export function barHtml(seg, { n, top, label, color }) {
+// One bar. `top` is a CSS length; `label` is HTML, and `check` the symbol
+// that goes in front of it. The shape is the event's choice: a filled block, a
+// line with arrowheads at both ends, or a plain line.
+export function barHtml(seg, { n, top, label, color, check = '' }) {
   const { occ } = seg.item;
   const ev = occ.ev;
   const shape = SHAPES.includes(ev.shape) ? ev.shape : 'block';
   const cls = ['bar', `c-${color}`, `shape-${shape}`, ev.tentative && 'tent', seg.contL && 'cl', seg.contR && 'cr'].filter(Boolean).join(' ');
   const style = `left:calc(${seg.a} * 100% / ${n} + var(--bar-pad));width:calc(${seg.b - seg.a + 1} * 100% / ${n} - 2 * var(--bar-pad));top:${top}`;
   const title = esc(ev.title || '(No title)');
-  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}${ev.tentative ? ' (tentative)' : ''}"><i class="bar-l"></i><span class="bar-t">${label}</span><i class="bar-r"></i></div>`;
+  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}${ev.tentative ? ' (tentative)' : ''}"><i class="bar-l"></i><span class="bar-t">${check}${label}</span><i class="bar-r"></i></div>`;
 }

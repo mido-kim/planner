@@ -2,12 +2,13 @@ import { addDays, dateOf, dt, fmt, fmtTime, fmtTimeRange, minOf, nowMin, parseTi
 import { icons } from '../icons.js';
 import { colorOf } from '../labels.js';
 import { describeRule, spanDays } from '../recurrence.js';
+import { checkButton, isDone } from '../symbols.js';
 import { esc } from '../util.js';
 
 // The agenda beside or below the calendar: what's still ahead in the dates on
 // screen (events, deadlines and tasks) day by day with their full details,
-// plus overdue tasks and tasks with no date. Events that are over and done
-// tasks only show when asked for (`showPast`).
+// plus overdue tasks and tasks with no date. Events that are over and checked-
+// off deadlines and tasks only show when asked for (`showPast`).
 
 // Open tasks counted on the agenda button.
 export function tasksInView(tasks, from, to) {
@@ -24,8 +25,8 @@ const TYPE_ORDER = { event: 0, deadline: 1, task: 2 };
 // Items are { type: 'event' | 'deadline' | 'task', occ | task }. All-day
 // events show on each day they cover; timed events on the day they start
 // (or the first day shown, if they started before it). Unless `showPast`,
-// events and deadlines that are over by `now` ('YYYY-MM-DDTHH:mm') and done
-// tasks are left out; `hidden` counts them.
+// events and deadlines that are over by `now` ('YYYY-MM-DDTHH:mm'), checked-
+// off deadlines and done tasks are left out; `hidden` counts them.
 export function agendaGroups({ from, to, occs, tasks, showPast, t = today(), now = dt(t, nowMin()) }) {
   const groups = [];
   let hiddenTasks = 0;
@@ -49,13 +50,14 @@ export function agendaGroups({ from, to, occs, tasks, showPast, t = today(), now
   };
   for (const occ of occs) {
     if (occ.ev.kind === 'deadline' && occ.ev.allDay) {
-      add(occ.date, { type: 'deadline', occ, sort: 1440 }, occ.date < t); // due that day: at its end
+      add(occ.date, { type: 'deadline', occ, sort: 1440 }, occ.date < t || isDone(occ)); // due that day: at its end
     } else if (occ.ev.allDay) {
       const last = addDays(occ.date, spanDays(occ.ev));
       for (let d = occ.date < from ? from : occ.date; d <= last && d < to; d = addDays(d, 1)) add(d, { type: 'event', occ, sort: -2 }, d < t); // all-day first
     } else {
       const d = occ.date < from ? from : occ.date;
-      add(d, { type: occ.ev.kind === 'deadline' ? 'deadline' : 'event', occ, sort: occ.date < from ? -1 : minOf(occ.start) }, occ.end <= now);
+      const kind = occ.ev.kind === 'deadline' ? 'deadline' : 'event';
+      add(d, { type: kind, occ, sort: occ.date < from ? -1 : minOf(occ.start) }, occ.end <= now || (kind === 'deadline' && isDone(occ)));
     }
   }
   for (const task of tasks) {
@@ -110,7 +112,7 @@ export function renderAgenda({ from, to, occs, tasks, events, labels = new Map()
       if (sd < day) when = `Continues · ${when}`;
     }
     return `<div class="ag c-${colorOf(ev, labels)}${ev.tentative ? ' tent' : ''}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}">
-      <i class="ag-dot"></i>
+      ${checkButton(occ, labels, 17)}
       <div class="ag-main">
         <div class="ag-title">${esc(ev.title || '(No title)')}</div>
         <div class="ag-when">${when}${ev.tentative ? ' · <span class="ag-tent">Tentative</span>' : ''}</div>
@@ -121,8 +123,8 @@ export function renderAgenda({ from, to, occs, tasks, events, labels = new Map()
 
   const deadlineCard = ({ occ }) => {
     const ev = occ.ev;
-    return `<div class="ag dline c-${colorOf(ev, labels)}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}">
-      <span class="ag-flag">${icons.flagBtn}</span>
+    return `<div class="ag dline c-${colorOf(ev, labels)}${isDone(occ) ? ' done' : ''}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}">
+      ${checkButton(occ, labels, 17)}
       <div class="ag-main">
         <div class="ag-title">${esc(ev.title || '(No title)')}</div>
         <div class="ag-when">${ev.allDay ? 'Due any time that day' : `Due ${fmtTime(minOf(occ.start), h24)}`}</div>

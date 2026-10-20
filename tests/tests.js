@@ -8,6 +8,7 @@ import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
 import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
 import { baseOf, cssVars, hexToHsl, hslToHex, toHex } from '../js/themes.js';
+import { doneOps, isDone, symbolOf } from '../js/symbols.js';
 
 const results = [];
 function test(name, fn) {
@@ -398,6 +399,37 @@ test('move: a whole weekly series a day later moves its weekday too', () => {
 test('.ics export: a deadline with no time is a date', () => {
   const ics = icsFile(map({ ...deadline, allDay: true, start: '2026-10-14', end: '2026-10-14' }));
   if (!ics.includes('DTSTART;VALUE=DATE:20261014') || ics.includes('DTEND')) throw new Error('wrong date-only deadline');
+});
+
+// ---- checking off events and deadlines
+test('check off: one date of a series, then un-check it', () => {
+  const [on] = puts(doneOps(weekly, '2026-10-19', true));
+  eq(on.doneDates, ['2026-10-19']);
+  eq([isDone({ ev: on, date: '2026-10-19' }), isDone({ ev: on, date: '2026-10-26' })], [true, false]);
+  eq(puts(doneOps(on, '2026-10-19', false))[0].doneDates, []);
+});
+test('check off: checked dates go along when a series is edited, moved or cut', () => {
+  const s = { ...weekly, doneDates: ['2026-10-12', '2026-10-19', '2026-10-26'] };
+  // This event, a day later: the series forgets it; the copy keeps it on its new day.
+  const [m, d] = puts(saveOps(map(s), s, '2026-10-19', { start: '2026-10-20T09:00', end: '2026-10-20T10:00', rrule: null }, 'this'));
+  eq([m.doneDates, d.doneDates], [['2026-10-12', '2026-10-26'], ['2026-10-20']]);
+  // This and following: split between the two series.
+  const [old, next] = puts(saveOps(map(s), s, '2026-10-19', { start: '2026-10-19T09:00', end: '2026-10-19T10:00', rrule: s.rrule }, 'following'));
+  eq([old.doneDates, next.doneDates], [['2026-10-12'], ['2026-10-19', '2026-10-26']]);
+  // All events a day later.
+  eq(puts(moveOps(map(s), s, '2026-10-19', 1440, 'all'))[0].doneDates, ['2026-10-13', '2026-10-20', '2026-10-27']);
+  // A deleted date isn't kept as checked.
+  eq(puts(deleteOps(map(s), s, '2026-10-26', 'this'))[0].doneDates, ['2026-10-12', '2026-10-19']);
+});
+test("symbols: its own, else its label's, else a check box; a deadline has its flag", () => {
+  const labels = new Map([['L', { id: 'L', symbol: 'heart' }]]);
+  eq([symbolOf(ev({ labelId: 'L' }), labels), symbolOf(ev({ labelId: 'L', symbol: 'star' }), labels), symbolOf(ev({}), labels), symbolOf(deadline, labels), symbolOf(ev({ symbol: 'nope' }), labels)],
+    ['heart', 'star', 'check', 'flag', 'check']);
+});
+test('agenda: a checked-off deadline is left out until asked for', () => {
+  const occs = expand({ ...deadline, doneDates: ['2026-10-14'] }, '2026-10-14', '2026-10-15');
+  const g = agendaGroups({ from: '2026-10-14', to: '2026-10-15', occs, tasks: [], showPast: false, t: '2026-10-14', now: '2026-10-14T09:00' });
+  eq([g.groups.length, g.hidden], [0, 1]);
 });
 
 // ---- themes and their backups

@@ -9,6 +9,9 @@ import { uid } from './util.js';
 //
 // Each function returns a list of writes ({ op, coll, obj | id }) for the store
 // to apply together. `date` is the date of the occurrence the user picked.
+//
+// Checked-off dates (`doneDates`, see symbols.js) go along like `exdates`:
+// they move with the dates they belong to.
 
 const put = (obj) => ({ op: 'put', coll: 'events', obj });
 const remove = (id) => ({ op: 'remove', coll: 'events', id });
@@ -19,8 +22,11 @@ export const isRepeating = (events, ev) => !!(ev.rrule || masterOf(events, ev));
 
 const detachedOf = (events, id) => [...events.values()].filter((e) => e.seriesId === id);
 
+const doneOn = (ev, date) => !!ev.doneDates?.includes(date);
+const shiftDone = (ev, days) => (ev.doneDates || []).map((d) => addDays(d, days));
+
 function withExdate(ev, date) {
-  return touch({ ...ev, exdates: [...new Set([...(ev.exdates || []), date])] });
+  return touch({ ...ev, exdates: [...new Set([...(ev.exdates || []), date])], doneDates: (ev.doneDates || []).filter((d) => d !== date) });
 }
 
 // The series as it was, ending the day before `date`.
@@ -29,6 +35,7 @@ function endBefore(ev, date) {
     ...ev,
     rrule: { ...ev.rrule, until: addDays(date, -1), count: null },
     exdates: (ev.exdates || []).filter((d) => d < date),
+    doneDates: (ev.doneDates || []).filter((d) => d < date),
   });
 }
 
@@ -54,26 +61,33 @@ export function deleteOps(events, ev, date, scope) {
 export function saveOps(events, ev, date, form, scope) {
   const now = Date.now();
   if (!ev) {
-    return [put(alignStart({ id: uid(), ...form, exdates: [], seriesId: null, originalDate: null, createdAt: now, updatedAt: now }))];
+    return [put(alignStart({ id: uid(), ...form, exdates: [], doneDates: [], seriesId: null, originalDate: null, createdAt: now, updatedAt: now }))];
   }
 
   const master = masterOf(events, ev);
   if (master) {
-    if (scope === 'this') return [put(touch({ ...ev, ...form, rrule: null }))];
+    if (scope === 'this') return [put(touch({ ...ev, ...form, rrule: null, doneDates: shiftDone(ev, diffDays(dateOf(ev.start), dateOf(form.start))) }))];
     // Fold this occurrence back into its series, then edit the series.
-    const restored = { ...master, exdates: (master.exdates || []).filter((d) => d !== ev.originalDate) };
+    const restored = {
+      ...master,
+      exdates: (master.exdates || []).filter((d) => d !== ev.originalDate),
+      doneDates: doneOn(ev, dateOf(ev.start)) ? [...new Set([...(master.doneDates || []), ev.originalDate])] : master.doneDates || [],
+    };
     const others = new Map(events);
     others.delete(ev.id);
     others.set(master.id, restored);
     return [...saveOps(others, restored, ev.originalDate, form, scope), remove(ev.id)];
   }
 
-  if (!ev.rrule) return [put(alignStart(touch({ ...ev, ...form })))];
+  if (!ev.rrule) return [put(alignStart(touch({ ...ev, ...form, doneDates: shiftDone(ev, diffDays(dateOf(ev.start), dateOf(form.start))) })))];
 
   if (scope === 'this') {
     return [
       put(withExdate(ev, date)),
-      put({ ...ev, ...form, id: uid(), rrule: null, exdates: [], seriesId: ev.id, originalDate: date, createdAt: now, updatedAt: now }),
+      put({
+        ...ev, ...form, id: uid(), rrule: null, exdates: [], doneDates: doneOn(ev, date) ? [dateOf(form.start)] : [],
+        seriesId: ev.id, originalDate: date, createdAt: now, updatedAt: now,
+      }),
     ];
   }
 
@@ -89,6 +103,7 @@ export function saveOps(events, ev, date, form, scope) {
       start: shiftDays(form.start, back),
       end: shiftDays(form.end, back),
       exdates: form.rrule ? (ev.exdates || []).map((d) => addDays(d, moved)) : [],
+      doneDates: shiftDone(ev, moved),
     });
     const ops = [put(alignStart(next))];
     // A series that stops repeating leaves its changed occurrences standing alone.
@@ -113,6 +128,7 @@ export function saveOps(events, ev, date, form, scope) {
       rrule,
       id,
       exdates: rrule ? (ev.exdates || []).filter((d) => d >= date).map((d) => addDays(d, moved)) : [],
+      doneDates: rrule ? (ev.doneDates || []).filter((d) => d >= date).map((d) => addDays(d, moved)) : doneOn(ev, date) ? [dateOf(form.start)] : [],
       seriesId: null,
       originalDate: null,
       createdAt: now,

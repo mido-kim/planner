@@ -3,6 +3,7 @@ import { icons } from '../icons.js';
 import { colorOf } from '../labels.js';
 import { spanDays } from '../recurrence.js';
 import { holidayName } from '../holidays.js';
+import { checkButton, isDone } from '../symbols.js';
 import { esc } from '../util.js';
 import { barHtml, layoutBars } from './bars.js';
 
@@ -76,7 +77,7 @@ const hourText = (h, h24, short) => {
 // things outside the hours shown (oor); plus the bars for the all-day row.
 // Each day runs from its first shown hour to H1, which may be past midnight;
 // the small hours before that belong to the day before.
-function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
+function collect(days, occs, tasks, { H0, H1, scale, h24, color, labels }) {
   const cols = new Map(days.map((d) => [d, { oor: [], segs: [], marks: [], bottom: [], endLines: [] }]));
   const bars = [];
   const off = Math.max(0, H1 - 1440);
@@ -103,7 +104,7 @@ function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
       const at = spot(occ.date, min);
       if (!at) continue;
       if (at.p.where === 'grid') at.col.marks.push({ occ, top: at.p.top });
-      else oor(at.col, at.p.where, min, (style) => chip(occ, color(ev), 'oor dl-chip', `${arrow(at.p.where)}<b>${fmtTime(min, h24)}</b>${icons.flag}<span class="ct">${esc(ev.title || '(No title)')}</span>`, style));
+      else oor(at.col, at.p.where, min, (style) => chip(occ, color(ev), 'oor dl-chip', `${arrow(at.p.where)}<b>${fmtTime(min, h24)}</b>${checkButton(occ, labels, 11)}<span class="ct">${esc(ev.title || '(No title)')}</span>`, style));
       continue;
     }
     if (isBarEvent(occ)) {
@@ -121,7 +122,7 @@ function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
       const b = Math.min(e, hi) - ds;
       if (b <= a) return;
       const col = cols.get(d);
-      const label = (where) => (style) => chip(occ, color(ev), 'oor', `${arrow(where)}<b>${fmtTime(a, h24)}</b> <span class="ct">${esc(ev.title || '(No title)')}</span>`, style);
+      const label = (where) => (style) => chip(occ, color(ev), 'oor', `${arrow(where)}<b>${fmtTime(a, h24)}</b> ${checkButton(occ, labels, 11)}<span class="ct">${esc(ev.title || '(No title)')}</span>`, style);
       if (b <= H0) oor(col, 'early', a, label('early'));
       else if (a >= H1) oor(col, 'late', a, label('late'));
       else {
@@ -152,7 +153,7 @@ function collect(days, occs, tasks, { H0, H1, scale, h24, color }) {
 
 // The all-day row: one strip across the days, with bars in lanes and each
 // day's out-of-hours chips under its bars. Returns its HTML and height.
-function allDayStrip(days, cols, bars, { rowH, h24, color, cls }) {
+function allDayStrip(days, cols, bars, { rowH, h24, color, labels, cls }) {
   const n = days.length;
   const { segs, used } = layoutBars(bars, days);
   const strip = days.map((d, i) =>
@@ -160,7 +161,7 @@ function allDayStrip(days, cols, bars, { rowH, h24, color, cls }) {
   for (const s of segs) {
     const ev = s.item.occ.ev;
     const time = !ev.allDay && !s.contL ? `<b>${fmtTime(minOf(s.item.occ.start), h24)}</b> ` : '';
-    strip.push(barHtml(s, { n, top: `${2 + s.lane * rowH}px`, label: time + esc(ev.title || '(No title)'), color: color(ev) }));
+    strip.push(barHtml(s, { n, top: `${2 + s.lane * rowH}px`, label: time + esc(ev.title || '(No title)'), color: color(ev), check: checkButton(s.item.occ, labels, 12) }));
   }
   let rows = 0;
   days.forEach((d, i) => {
@@ -191,8 +192,8 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
   const now = slotOf(t, nowMin(), H1);
 
   const heads = days.map((d) => dayHead(d, 'tg-dayhead', t, parts(d).d));
-  const pre = collect(days, occs, tasks, { H0, H1, scale: 1, h24, color });
-  const strip = allDayStrip(days, pre.cols, pre.bars, { rowH: AD_ROW, h24, color, cls: 'tg-allday' });
+  const pre = collect(days, occs, tasks, { H0, H1, scale: 1, h24, color, labels });
+  const strip = allDayStrip(days, pre.cols, pre.bars, { rowH: AD_ROW, h24, color, labels, cls: 'tg-allday' });
   let ppm = settings.hourHeight / 60;
   let fit = false;
   if (fitHeight) {
@@ -205,12 +206,12 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
   const colH = (H1 - H0) * ppm;
   // Short events stay tappable, but on a tightly squeezed day less so.
   const minPx = Math.min(MIN_PX, Math.max(12, ppm * 30));
-  const { cols } = collect(days, occs, tasks, { H0, H1, scale: ppm, h24, color });
+  const { cols } = collect(days, occs, tasks, { H0, H1, scale: ppm, h24, color, labels });
 
   const bodies = days.map((d) => {
     const { segs, marks, bottom, endLines } = cols.get(d);
     layout(segs, minPx / ppm);
-    const html = [workBand(d, settings, H0, H1, ppm, 'px'), ...segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev), minPx))];
+    const html = [workBand(d, settings, H0, H1, ppm, 'px'), ...segs.map((seg) => eventBlock(seg, H0, ppm, h24, color(seg.occ.ev), minPx, labels))];
     // Deadlines and timed tasks, top to bottom. A deadline's tag sits above its
     // line, or below it when there's no room; task chips that would overlap
     // move down.
@@ -223,7 +224,7 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
         const below = m.top - TAG_PX < Math.max(0, tagFloor);
         tagFloor = below ? m.top + TAG_PX : m.top;
         tags.push(below ? [m.top - 1, m.top + TAG_PX] : [m.top - TAG_PX, m.top + 1]);
-        html.push(deadlineLine(m.occ, `${m.top}px`, h24, color(m.occ.ev), below));
+        html.push(deadlineLine(m.occ, `${m.top}px`, h24, color(m.occ.ev), below, labels));
       } else {
         const top = Math.max(m.top, taskFloor);
         taskFloor = top + TASK_PX + 2;
@@ -234,7 +235,7 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
     // their tag above; tasks sit just after it, or just before when there's
     // no room. (main.js then moves them clear of other labels.)
     const mid = dayEndAt(H0, H1, colH, ppm);
-    endLines.forEach((occ, k) => html.push(deadlineLine(occ, `${mid - k * (TAG_PX + 2)}px`, h24, color(occ.ev), false)));
+    endLines.forEach((occ, k) => html.push(deadlineLine(occ, `${mid - k * (TAG_PX + 2)}px`, h24, color(occ.ev), false, labels)));
     const below = colH - mid >= bottom.length * (TASK_PX + 2) + 2;
     bottom.sort(byDoneThenCreated).forEach((task, k) => {
       const top = below ? mid + 2 + k * (TASK_PX + 2) : mid - (endLines.length ? TAG_PX : 0) - (k + 1) * (TASK_PX + 2);
@@ -281,19 +282,19 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
   }
 
   const weeks = [days.slice(0, 7), days.slice(7, 14)].map((week, w) => {
-    const { cols, bars } = collect(week, occs, tasks, { H0, H1, scale: pct, h24, color });
+    const { cols, bars } = collect(week, occs, tasks, { H0, H1, scale: pct, h24, color, labels });
     const heads = week.map((d) =>
       dayHead(d, 'tw-dayhead', t, parts(d).d === 1 || (w === 0 && d === week[0]) ? fmt(d, { month: 'short', day: 'numeric' }) : parts(d).d));
-    const strip = allDayStrip(week, cols, bars, { rowH: MINI_AD_ROW, h24, color, cls: 'tw-allday' });
+    const strip = allDayStrip(week, cols, bars, { rowH: MINI_AD_ROW, h24, color, labels, cls: 'tw-allday' });
     const bodies = week.map((d) => {
       const { segs, marks, bottom, endLines } = cols.get(d);
       layout(segs, 20);
-      const html = [workBand(d, settings, H0, H1, pct, '%'), ...segs.map((seg) => miniBlock(seg, H0, pct, h24, color(seg.occ.ev)))];
+      const html = [workBand(d, settings, H0, H1, pct, '%'), ...segs.map((seg) => miniBlock(seg, H0, pct, h24, color(seg.occ.ev), labels))];
       marks.sort((x, y) => x.top - y.top);
       let lastTask = -Infinity;
       let stack = 0;
       for (const m of marks) {
-        if (m.occ) html.push(deadlineLine(m.occ, `${m.top}%`, h24, color(m.occ.ev), m.top < 8));
+        if (m.occ) html.push(deadlineLine(m.occ, `${m.top}%`, h24, color(m.occ.ev), m.top < 8, labels));
         else {
           // Tasks close together stack downwards.
           stack = m.top - lastTask < 6 ? stack + 1 : 0;
@@ -302,7 +303,7 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
         }
       }
       const mid = H1 > 1440 && H0 < 1440 ? `${(1440 - H0) * pct}%` : '100% - 1px';
-      endLines.forEach((occ, k) => html.push(deadlineLine(occ, `calc(${mid} - ${k * 14}px)`, h24, color(occ.ev), false)));
+      endLines.forEach((occ, k) => html.push(deadlineLine(occ, `calc(${mid} - ${k * 14}px)`, h24, color(occ.ev), false, labels)));
       bottom.sort(byDoneThenCreated).forEach((task, k) =>
         html.push(taskChip(task, color(task, 'none'), 'tchip', '', `top:calc(${mid} + ${2 + k * MINI_TASK_PX}px)`)));
       if (d === now.day && now.min >= H0 && now.min < H1) html.push(`<div class="now" style="top:${(now.min - H0) * pct}%"></div>`);
@@ -328,11 +329,13 @@ function taskChip(task, color, cls, before, style) {
   return `<div class="${cls} c-${color}${task.done ? ' done' : ''}" style="${style}" role="button" tabindex="0" data-task="${esc(task.id)}"${task.dueTime ? '' : ' data-notime'} title="${title}${task.done ? ' (done)' : ''}">${before}<input type="checkbox" data-toggle="${esc(task.id)}" ${task.done ? 'checked' : ''} aria-label="Done"><span class="tk-t">${title}</span></div>`;
 }
 
-function deadlineLine(occ, top, h24, color, below) {
+// A deadline's flag checks it off, which crosses its name out.
+function deadlineLine(occ, top, h24, color, below, labels) {
   const ev = occ.ev;
   const title = esc(ev.title || '(No title)');
   const due = ev.allDay ? 'due that day' : `due ${fmtTime(minOf(occ.start), h24)}`;
-  return `<div class="dl c-${color}${below ? ' below' : ''}${ev.allDay ? ' day-end' : ''}" style="top:${top}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${due}"><span class="dl-tag">${icons.flag}<span class="ct">${title}</span></span></div>`;
+  const cls = ['dl', `c-${color}`, below && 'below', ev.allDay && 'day-end', isDone(occ) && 'done'].filter(Boolean).join(' ');
+  return `<div class="${cls}" style="top:${top}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${due}"><span class="dl-tag">${checkButton(occ, labels, 11)}<span class="ct">${title}</span></span></div>`;
 }
 
 // Splits overlapping events into side-by-side columns. Each event gets a
@@ -382,7 +385,7 @@ function across(seg) {
   return `left:calc(${left}% + 1px);width:calc(${width}% - 3px);z-index:${1 + seg.col}`;
 }
 
-function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX) {
+function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX, labels = new Map()) {
   const { occ } = seg;
   const ev = occ.ev;
   const top = (seg.va - H0) * ppm;
@@ -396,18 +399,18 @@ function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX) {
   // Short blocks put the title first and give it the room; the time only
   // shows in what's left over.
   const body = short
-    ? `<span class="ev-t">${title}</span><span class="ev-m">${fmtTime(minOf(occ.start), h24)}</span>`
-    : `<span class="ev-t">${title}</span><span class="ev-m">${time}${repeat}</span>`;
+    ? `<span class="ev-t">${checkButton(occ, labels, 12)}${title}</span><span class="ev-m">${fmtTime(minOf(occ.start), h24)}</span>`
+    : `<span class="ev-t">${checkButton(occ, labels, 12)}${title}</span><span class="ev-m">${time}${repeat}</span>`;
   return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}">${body}</div>`;
 }
 
 // In the 2-week view an event is a small block with just its title.
-function miniBlock(seg, H0, pct, h24, color) {
+function miniBlock(seg, H0, pct, h24, color, labels) {
   const { occ } = seg;
   const ev = occ.ev;
   const title = esc(ev.title || '(No title)');
   const time = fmtTimeRange(minOf(occ.start), minOf(occ.end), h24);
   const cls = ['ev', 'mini', `c-${color}`, ev.tentative && 'tent', seg.contTop && 'ct', seg.contBottom && 'cb'].filter(Boolean).join(' ');
   const style = `top:${(seg.va - H0) * pct}%;height:${(seg.vb - seg.va) * pct}%;${across(seg)}`;
-  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}"><span class="ev-t">${title}</span></div>`;
+  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}"><span class="ev-t">${checkButton(occ, labels, 9)}${title}</span></div>`;
 }

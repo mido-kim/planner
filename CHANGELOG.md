@@ -3,6 +3,23 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.7.0 (2026-10-20)
+
+- Deadlines can be checked off like tasks: tap the flag. It fills in, the
+  name is crossed out, and the deadline leaves the agenda (until "Show past
+  or completed").
+- Events have a little symbol in front of their name: tap it to mark the
+  event done (went, attended, finished). It's an outline until then and
+  fills in after. Symbols: check box (the default), circle, heart, star,
+  sparkle, speech bubble, book, light bulb, beaker, lightning, music note,
+  coffee, leaf, dumbbell, smile and bookmark.
+- A label can have a symbol for all its events (Labels → the pencil, or when
+  adding one), and an event can have its own (event editor → Symbol; "Same
+  as label" follows its label).
+- A repeating event or deadline is checked off one date at a time, and those
+  dates go along when the series is moved, split or one date is changed.
+- Long dialogs scroll instead of squeezing their rows together.
+
 ## 0.6.2 (2026-10-20)
 
 - Moving to other dates glides like scrolling a page: the old dates move out

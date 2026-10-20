@@ -11,6 +11,7 @@ import { expand, spanDays } from './recurrence.js';
 import { deleteOps, isRepeating, masterOf, moveOps, saveOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
+import { doneOps } from './symbols.js';
 import { applyTheme, baseOf, builtIn, cssVars } from './themes.js';
 import { $, esc, readJSON, uid, writeJSON } from './util.js';
 import { renderMonth } from './views/month.js';
@@ -468,6 +469,12 @@ function addTask(title, due) {
   commit([{ op: 'put', coll: 'tasks', obj: { id: uid(), title, notes: '', due: due || null, dueTime: null, labelId: null, color: null, done: false, doneAt: null, createdAt: now, updatedAt: now } }]);
 }
 
+// Checking off one date of an event or deadline (its symbol or flag).
+function toggleCheck(id, date) {
+  const ev = state.events.get(id);
+  if (ev) commit(doneOps(ev, date, !ev.doneDates?.includes(date)));
+}
+
 function toggleTask(id, done) {
   const t = state.tasks.get(id);
   if (t) commit([{ op: 'put', coll: 'tasks', obj: { ...t, done, doneAt: done ? Date.now() : null, updatedAt: Date.now() } }]);
@@ -499,9 +506,9 @@ function labelAction(type, p) {
   const label = state.labels.get(p.id);
   switch (type) {
     case 'add':
-      return commit([{ op: 'put', coll: 'labels', obj: { id: uid(), name: p.name, color: p.color, status: 'active', createdAt: now, updatedAt: now } }]);
+      return commit([{ op: 'put', coll: 'labels', obj: { id: uid(), name: p.name, color: p.color, symbol: p.symbol, status: 'active', createdAt: now, updatedAt: now } }]);
     case 'update':
-      return commit([{ op: 'put', coll: 'labels', obj: { ...label, name: p.name, color: p.color, updatedAt: now } }]);
+      return commit([{ op: 'put', coll: 'labels', obj: { ...label, name: p.name, color: p.color, symbol: p.symbol, updatedAt: now } }]);
     case 'status':
       return commit(setLabelStatusOps(label, p.status));
     case 'delete':
@@ -1132,7 +1139,7 @@ function wireMoves() {
   app.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
     const el = e.target.closest(MOVABLE);
-    if (!el || e.target.closest('input')) return;
+    if (!el || e.target.closest('input, .sym')) return;
     down = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
   });
   app.addEventListener('pointermove', (e) => {
@@ -1292,7 +1299,7 @@ function wireGestures() {
     if (e.touches.length !== 1 || sel || mv) return;
     const t = e.touches[0];
     const item = e.target.closest(MOVABLE);
-    if (item && !e.target.closest('input')) {
+    if (item && !e.target.closest('input, .sym')) {
       // Hold an item to pick it up; a tap still opens it.
       const p = { item, x: t.clientX, y: t.clientY, active: false };
       p.timer = setTimeout(() => {
@@ -1371,6 +1378,8 @@ function wireEvents() {
   app.addEventListener('click', (e) => {
     const t = e.target;
     if (t.matches('[data-toggle]')) return; // ticking a task off is handled on change
+    const check = t.closest('[data-check]');
+    if (check) return toggleCheck(check.dataset.check, check.dataset.date);
     const act = t.closest('[data-action]');
     if (act) return actions[act.dataset.action]?.();
     const view = t.closest('[data-view]');

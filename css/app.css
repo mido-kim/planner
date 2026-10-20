@@ -511,6 +511,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .chip.oor b { font-weight: 600; color: var(--ci); }
 .chip.oor svg { flex: none; color: var(--cl); }
+.chip.oor .sym { margin-right: 2px; }
 .chip.oor.tk-chip { border: 0; padding-left: 2px; }
 .chip.tk-chip .tk-t { color: var(--ci); font-weight: 600; }
 .chip.tk-chip.done .tk-t { text-decoration: line-through; color: var(--fg-3); }
@@ -690,11 +691,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .tg.n7 .ev.short { padding-top: 0; padding-bottom: 0; }
   .tg.n7 .chip, .tg.n7 .bar { font-size: 10.5px; }
   .tg.n7 .chip { padding: 0 3px; }
-  .tg.n7 .chip.oor svg { display: none; }
+  .tg.n7 .chip.oor > svg { display: none; }
   .tg.n7 .bar.shape-block { padding: 0 3px; }
   .tg.n7 .tchip { font-size: 10px; padding: 0 3px 0 2px; gap: 2px; }
-  .tg.n7 .dl-tag { font-size: 9.5px; padding: 0 3px 0 2px; }
-  .tg.n7 .dl-tag svg { display: none; }
+  .tg.n7 .dl-tag { font-size: 9.5px; padding: 0 3px 0 0; gap: 1px; }
+  .tg.n7 .sym-svg { width: 10px; height: 10px; }
   .tg-dayhead .dom { font-size: 18px; min-width: 26px; height: 26px; }
 }
 
@@ -754,7 +755,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .ev.mini { gap: 0; min-height: 3px; padding: 1px 3px; border-radius: 3px; font-size: 10px; line-height: 1.15; }
 
 .tw .dl-tag { height: 12px; padding: 0 3px; font-size: 9px; line-height: 12px; }
-.tw .dl-tag svg { display: none; }
+.tw .sym-svg { width: 9px; height: 9px; }
+.tw .dl-tag { gap: 1px; padding-left: 0; }
 .tw .tchip { height: 15px; gap: 2px; padding: 0 3px 0 2px; border-radius: 4px; font-size: 9.5px; }
 .tw .tchip input { width: 9px; height: 9px; }
 @media (max-width: 760px) {
@@ -858,6 +860,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .dl-tag svg { flex: none; }
 .dl.below .dl-tag { bottom: auto; top: 100%; }
 .dl-tag svg { color: var(--cl); }
+.dl-tag .sym { margin: 0; }
+.dl.done { opacity: 0.55; }
+.dl.done .ct { text-decoration: line-through; }
 .dl:hover .dl-tag { background: color-mix(in srgb, var(--c) 35%, transparent); border-radius: 4px; }
 
 /* A task: its title in its color beside a small round tick box, without an
@@ -883,6 +888,56 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tk-t { overflow: hidden; min-width: 0; }
 .tchip.done { opacity: 0.55; }
 .tchip.done .tk-t { text-decoration: line-through; }
+
+/* An event's or deadline's symbol (symbols.js): tap it to check the item
+   off. Outline until then; filled in after, with its inner lines in the
+   color behind it. */
+.sym {
+  --sym-cut: var(--cf, var(--bg));
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  margin: 0 3px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cl, var(--fg-3));
+  line-height: 0;
+  vertical-align: -0.15em;
+  cursor: pointer;
+}
+.sym:hover { color: var(--ci, var(--fg)); }
+.sym:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 1px; border-radius: 3px; }
+.sym-svg .k { display: none; }
+.sym.on .sym-svg .s { fill: currentColor; }
+.sym.on .sym-svg .d, .sym.on .sym-svg .k { display: inline; stroke: var(--sym-cut); }
+/* Where the item has no fill of its own, the cut-outs take the page's color. */
+.ag > .sym, .dl .sym, .mchip .sym, .chip.oor .sym, .bar:not(.shape-block) .sym, .ev.tent .sym { --sym-cut: var(--bg); }
+.ag:not(.dline):not(.tent) > .sym { --sym-cut: color-mix(in srgb, var(--c) calc(var(--fill) * 0.6), var(--bg)); }
+@media (pointer: coarse) {
+  .sym::before { content: ""; position: absolute; inset: -6px; }
+}
+
+/* Picking a symbol (event editor, labels). */
+.sym-pick { display: flex; flex-wrap: wrap; gap: 4px; }
+.sym-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.sym-opt span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  min-width: 32px;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--fg-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.sym-opt span:hover { background: var(--bg-hover); }
+.sym-opt input:checked + span { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1.5px var(--accent-strong); }
+.sym-opt input:focus-visible + span { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
+.sym-opt.follow span { padding: 0 10px 0 8px; }
 
 /* The round tick box of a task; done shows a white tick on its color. */
 .tchip input, .chip.tk-chip input, .mchip.mtask input, .ag.task input {
@@ -979,6 +1034,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .mchip:hover { background: var(--bg-3); }
 .mchip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--cl); flex: none; }
+.mchip .sym { margin: 0; }
+.mchip.dline.done .mtt { text-decoration: line-through; color: var(--fg-3); }
 .mchip .mt { color: var(--fg-2); flex: none; }
 .mchip .mtt { min-width: 0; overflow: hidden; }
 .mchip { cursor: pointer; }
@@ -997,6 +1054,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .mchip .mt, .mchip .dot { display: none; }
   /* No room for the dot on a phone, so timed events get a light tint. */
   .mchip:not(.dline):not(.mtask) { background: var(--cf); color: var(--ci); }
+  .mchip:not(.dline):not(.mtask):not(.tent) .sym { --sym-cut: var(--cf); }
+  .mchip .sym-svg { width: 9px; height: 9px; }
   .mchip.tent:not(.dline):not(.mtask) { background: transparent; box-shadow: inset 0 0 0 1px var(--cl); }
   .mchip.dline svg { width: 9px; height: 9px; }
   .mv .bar { font-size: 10px; }
@@ -1083,9 +1142,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .ag.tent { background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--cl); }
 .ag.task, .ag.dline { background: transparent; }
 .ag.task:hover, .ag.dline:hover { filter: none; background: var(--bg-hover); }
-.ag-dot { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--cl); }
-.ag.tent .ag-dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--cl); }
-.ag-flag { flex: none; display: inline-flex; margin-top: 1px; color: var(--cl); }
+.ag > .sym { margin: 0; }
+.ag.dline.done .ag-title { text-decoration: line-through; color: var(--fg-3); }
 .ag.task input { width: 15px; height: 15px; margin-top: 2px; border-width: 1.8px; }
 .ag-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ag-title { font-size: 14px; font-weight: 700; color: var(--fg); overflow-wrap: anywhere; }
@@ -1188,6 +1246,8 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.4); }
   gap: 10px;
   padding: 8px 18px 16px;
 }
+/* A long form scrolls rather than squeezing its rows together. */
+.dlg-body > * { flex-shrink: 0; }
 .dlg-foot {
   display: flex;
   align-items: center;
@@ -1460,12 +1520,12 @@ dialog.theme-maker-dlg::backdrop { background: transparent; }
 .labels-dlg section { display: flex; flex-direction: column; gap: 4px; }
 .label-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--bg-2); }
 .label-add input[name="newName"] { flex: 1 1 160px; }
-.label-add .swatches, .lrow .swatches { flex-basis: 100%; }
+.label-add .swatches, .lrow .swatches, .label-add .sym-pick, .lrow .sym-pick { flex-basis: 100%; }
 .label-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .label-list .empty { padding: 6px 2px; color: var(--fg-3); font-size: 13px; }
 .lrow { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 4px 2px; border-bottom: 1px solid var(--line-soft); }
 .lrow:last-child { border-bottom: 0; }
-.ldot { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1.5px var(--cl); }
+.ldot { flex: none; display: inline-flex; color: var(--cl); }
 .lname { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 500; overflow-wrap: anywhere; }
 .lcount { font-size: 12px; font-weight: 400; color: var(--fg-3); }
 .lrow.retired .lname { color: var(--fg-2); }

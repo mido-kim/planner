@@ -1,8 +1,8 @@
 import { addDays, daysFrom, fmt, minOf, parseTime, parts, today, weekday } from '../dates.js';
-import { icons } from '../icons.js';
 import { holidayName } from '../holidays.js';
 import { colorOf } from '../labels.js';
 import { spanDays, WEEKDAYS_SHORT } from '../recurrence.js';
+import { checkButton, isDone } from '../symbols.js';
 import { esc } from '../util.js';
 import { barHtml, layoutBars } from './bars.js';
 
@@ -26,7 +26,7 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
     if (ev.kind !== 'deadline' && (ev.allDay || span > 0)) {
       bars.push({ occ, first: occ.date, last: addDays(occ.date, span), title: ev.title || '' });
     } else {
-      const html = ev.kind === 'deadline' ? deadlineChip(occ, h24, color(ev)) : eventChip(occ, h24, color(ev));
+      const html = ev.kind === 'deadline' ? deadlineChip(occ, h24, color(ev), labels) : eventChip(occ, h24, color(ev), labels);
       // Date-only deadlines go at the end of the day, like date-only tasks.
       const min = ev.kind === 'deadline' && ev.allDay ? 1440 : minOf(occ.start);
       byDay.get(occ.date)?.push({ min, kind: ev.kind === 'deadline' ? 1 : 0, title: ev.title || '', html });
@@ -76,7 +76,7 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
     const barsHtml = segs.filter((s) => s.lane < shownLanes).map((s) => {
       const ev = s.item.occ.ev;
       const time = !ev.allDay && !s.contL ? `<span class="bt">${shortTime(minOf(s.item.occ.start), h24)}</span> ` : '';
-      return barHtml(s, { n: 7, top: `calc(var(--mtop) + ${s.lane} * var(--mrow))`, label: time + esc(ev.title || '(No title)'), color: color(ev) });
+      return barHtml(s, { n: 7, top: `calc(var(--mtop) + ${s.lane} * var(--mrow))`, label: time + esc(ev.title || '(No title)'), color: color(ev), check: checkButton(s.item.occ, labels, 11) });
     });
     weeks.push(`<div class="mv-week">${cells.join('')}${barsHtml.join('')}</div>`);
   }
@@ -96,15 +96,16 @@ function shortTime(min, h24) {
 
 const attrs = (occ) => `role="button" tabindex="0" data-id="${esc(occ.ev.id)}" data-date="${occ.date}"`;
 
-function eventChip(occ, h24, color) {
+// The event's symbol takes the place of a dot.
+function eventChip(occ, h24, color, labels) {
   const ev = occ.ev;
-  return `<div class="mchip c-${color}${ev.tentative ? ' tent' : ''}" ${attrs(occ)}><i class="dot"></i><span class="mt">${shortTime(minOf(occ.start), h24)}</span><span class="mtt">${esc(ev.title || '(No title)')}</span></div>`;
+  return `<div class="mchip c-${color}${ev.tentative ? ' tent' : ''}" ${attrs(occ)}>${checkButton(occ, labels, 11)}<span class="mt">${shortTime(minOf(occ.start), h24)}</span><span class="mtt">${esc(ev.title || '(No title)')}</span></div>`;
 }
 
-function deadlineChip(occ, h24, color) {
+function deadlineChip(occ, h24, color, labels) {
   const title = esc(occ.ev.title || '(No title)');
   const time = occ.ev.allDay ? '' : `<span class="mt">${shortTime(minOf(occ.start), h24)}</span>`;
-  return `<div class="mchip dline c-${color}" ${attrs(occ)} title="Deadline: ${title}">${icons.flag}${time}<span class="mtt">${title}</span></div>`;
+  return `<div class="mchip dline c-${color}${isDone(occ) ? ' done' : ''}" ${attrs(occ)} title="Deadline: ${title}">${checkButton(occ, labels, 11)}${time}<span class="mtt">${title}</span></div>`;
 }
 
 function taskChip(task, h24, color) {

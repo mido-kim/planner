@@ -46,8 +46,13 @@ and setup, CHANGELOG.md for history.
   writes via `moveOps` in series.js) and `fitText`, which fades text that's
   cut off (`.fade` / `.fade-last`); the app never uses "…".
 - `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
-  label picker), scope dialog, task editor, labels manager, create menu,
-  settings.
+  label picker, symbol picker), scope dialog, task editor, labels manager,
+  create menu, settings, theme maker.
+- `js/symbols.js`: the check-off symbols (outline → filled; parts `s` / `d` /
+  `k` in each SVG, styled in css under `.sym`), `symbolOf` (event's own, its
+  label's, else 'check'; deadlines 'flag'), `isDone`, `doneOps`,
+  `checkButton` (used by every view; main.js handles `[data-check]` clicks).
+  series.js carries `doneDates` along like `exdates`.
 - `js/recurrence.js`: repeat rules: `occurrenceDates`, `expand`,
   `describeRule`, `toRRule`. `js/series.js`: this/following/all edits and
   deletes, returned as write ops.
@@ -91,8 +96,10 @@ instances of the components; event positions there are fixed, not from data.
 
 ## Data
 
-Event: `{ id, kind, title, notes, labelId, color, shape, tentative, allDay,
-start, end, rrule, exdates, seriesId, originalDate, createdAt, updatedAt }`.
+Event: `{ id, kind, title, notes, labelId, color, shape, symbol, tentative,
+allDay, start, end, rrule, exdates, doneDates, seriesId, originalDate,
+createdAt, updatedAt }`. `symbol` is null to follow the label; `doneDates`
+are the occurrence dates checked off.
 `kind` is 'event' or 'deadline' (a deadline has `end === start`). `shape` is
 'block' | 'arrow' | 'line' (bars only). All-day `end` is the inclusive last
 date. Times are floating (no time zone). A changed occurrence is its own event
@@ -101,7 +108,8 @@ with `seriesId` + `originalDate`, and its date is in the series' `exdates`.
 Task: `{ id, title, notes, due, dueTime, labelId, color, done, doneAt,
 createdAt, updatedAt }`.
 
-Label: `{ id, name, color, status: 'active' | 'retired', createdAt, updatedAt }`.
+Label: `{ id, name, color, symbol, status: 'active' | 'retired', createdAt,
+updatedAt }`.
 
 Theme: `{ id, name, base: 'light' | 'dark', vars, createdAt, updatedAt }`;
 `vars` maps each part's CSS variable name (without `--`) to '#rrggbb', plus

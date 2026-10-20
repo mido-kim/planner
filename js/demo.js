@@ -9,12 +9,12 @@ export function demoStore(weekStart) {
   const t = today();
   const day = (i) => addDays(startOfWeek(t, weekStart), i);
   const now = Date.now();
-  const label = (id, name, color, status = 'active') => ({ id, name, color, status, createdAt: now, updatedAt: now });
+  const label = (id, name, color, symbol, status = 'active') => ({ id, name, color, symbol, status, createdAt: now, updatedAt: now });
   const labels = [
-    label('demo-l-research', 'Research', 'purple'),
-    label('demo-l-teaching', 'Teaching', 'orange'),
-    label('demo-l-personal', 'Personal', 'teal'),
-    label('demo-l-old', 'Old project', 'gray', 'retired'),
+    label('demo-l-research', 'Research', 'purple', 'beaker'),
+    label('demo-l-teaching', 'Teaching', 'orange', 'book'),
+    label('demo-l-personal', 'Personal', 'teal', 'heart'),
+    label('demo-l-old', 'Old project', 'gray', null, 'retired'),
   ];
   const ev = (id, title, color, start, end, extra = {}) => ({
     id, kind: 'event', title, color, labelId: null, shape: 'block', start, end, notes: '', tentative: false, allDay: false, rrule: null, exdates: [],
@@ -22,12 +22,12 @@ export function demoStore(weekStart) {
   });
   const at = (i, h, m = 0) => dt(day(i), h * 60 + m);
   const events = [
-    ev('demo-lab', 'Lab meeting', null, at(1, 10), at(1, 11, 30), { labelId: 'demo-l-research', rrule: { freq: 'weekly', interval: 1, byWeekday: [1, 3], until: null, count: null } }),
+    ev('demo-lab', 'Lab meeting', null, at(1, 10), at(1, 11, 30), { labelId: 'demo-l-research', rrule: { freq: 'weekly', interval: 1, byWeekday: [1, 3], until: null, count: null }, doneDates: [day(1)] }),
     ev('demo-us', 'Ultrasound experiment', 'green', at(2, 13), at(2, 17), { labelId: 'demo-l-research', notes: 'Bring the new transducer.' }),
-    ev('demo-ta', 'TA office hours', null, at(2, 14), at(2, 15), { labelId: 'demo-l-teaching' }),
-    ev('demo-coffee', 'Coffee chat', 'pink', at(2, 14, 30), at(2, 15)),
+    ev('demo-ta', 'TA office hours', null, at(2, 14), at(2, 15), { labelId: 'demo-l-teaching', symbol: 'chat', doneDates: [day(2)] }),
+    ev('demo-coffee', 'Coffee chat', 'pink', at(2, 14, 30), at(2, 15), { symbol: 'coffee' }),
     ev('demo-call', 'Quick call', 'gray', at(4, 9), at(4, 9, 15)),
-    ev('demo-gym', 'Gym', null, at(4, 6), at(4, 7), { labelId: 'demo-l-personal' }),
+    ev('demo-gym', 'Gym', null, at(4, 6), at(4, 7), { labelId: 'demo-l-personal', symbol: 'dumbbell' }),
     ev('demo-seminar', 'Seminar (maybe)', 'blue', at(4, 15), at(4, 16), { tentative: true }),
     ev('demo-writing', 'Paper writing', 'blue', at(3, 19), at(3, 23)),
     ev('demo-conf', 'Conference', 'red', day(5), day(6), { allDay: true, shape: 'arrow' }),
@@ -36,7 +36,7 @@ export function demoStore(weekStart) {
     ev('demo-visit', 'Family visit', null, day(9), day(11), { allDay: true, labelId: 'demo-l-personal', shape: 'line' }),
     ev('demo-dinner', 'Group dinner', 'orange', at(12, 18, 30), at(12, 21), { tentative: true }),
     ev('demo-trip', 'Field trip', 'teal', day(16), day(16), { allDay: true, tentative: true }),
-    ev('demo-abstract', 'Abstract due', null, at(3, 17), at(3, 17), { kind: 'deadline', labelId: 'demo-l-research' }),
+    ev('demo-abstract', 'Abstract due', null, at(3, 17), at(3, 17), { kind: 'deadline', labelId: 'demo-l-research', doneDates: [day(3)] }),
     ev('demo-hw', 'HW 3 grades due', null, at(5, 23, 59), at(5, 23, 59), { kind: 'deadline', labelId: 'demo-l-teaching' }),
     ev('demo-old', 'Old project report', null, at(10, 12), at(10, 12), { kind: 'deadline', labelId: 'demo-l-old' }),
     ev('demo-ko', '연구실 세미나 준비', null, at(1, 13), at(1, 14, 30), { labelId: 'demo-l-research' }),

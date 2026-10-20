@@ -25,6 +25,7 @@ const SHELL = [
   'js/series.js',
   'js/settings.js',
   'js/store.js',
+  'js/symbols.js',
   'js/util.js',
   'js/version.js',
   'js/views/month.js',
