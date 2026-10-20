@@ -18,6 +18,8 @@ const SHELL = [
   'js/holidays.js',
   'js/icons.js',
   'js/labels.js',
+  'js/theme-boot.js',
+  'js/themes.js',
   'js/main.js',
   'js/recurrence.js',
   'js/series.js',

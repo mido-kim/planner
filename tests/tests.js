@@ -7,6 +7,7 @@ import { HOLIDAYS } from '../js/holidays.js';
 import { agendaGroups } from '../js/views/agenda.js';
 import { layoutBars } from '../js/views/bars.js';
 import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from '../js/views/timegrid.js';
+import { baseOf, cssVars, hexToHsl, hslToHex, toHex } from '../js/themes.js';
 
 const results = [];
 function test(name, fn) {
@@ -390,6 +391,26 @@ test('move: a whole weekly series a day later moves its weekday too', () => {
 test('.ics export: a deadline with no time is a date', () => {
   const ics = icsFile(map({ ...deadline, allDay: true, start: '2026-10-14', end: '2026-10-14' }));
   if (!ics.includes('DTSTART;VALUE=DATE:20261014') || ics.includes('DTEND')) throw new Error('wrong date-only deadline');
+});
+
+// ---- themes and their backups
+test('themes: colors survive hex → HSL → hex', () => {
+  for (const hex of ['#ffffff', '#000000', '#ffcbe1', '#1a1619', '#2f5f84', '#bfe6dd', '#7a5a06']) eq(hslToHex(hexToHsl(hex)), hex, hex);
+  eq([toHex('#abc'), toHex('rgba(70, 60, 66, 0.04)'), toHex(' #FFCBE1')], ['#aabbcc', '#463c42', '#ffcbe1']);
+});
+test('themes: a dark background makes a dark theme, with its mixes', () => {
+  const vars = { bg: '#161a24', fg: '#f3ecef', accent: '#bcd8ec', fill: 30, 'today-tint': 7, work: 3 };
+  eq(baseOf(vars), 'dark');
+  eq(baseOf({ ...vars, bg: '#fcf6f7' }), 'light');
+  const css = cssVars('dark', vars);
+  eq([css.bg, css.fill, css['today-tint'], css.work, css['accent-soft']],
+    ['#161a24', '30%', '7%', 'color-mix(in srgb, var(--fg) 3% , transparent)'.replace(' ,', ','), 'color-mix(in srgb, var(--accent) 15%, var(--bg))']);
+});
+test('backup: saved themes go out and come back', () => {
+  const theme = { id: 't1', name: 'Night', base: 'dark', vars: { bg: '#161a24' } };
+  const { text } = backupFile(new Map(), new Map(), new Map(), new Map([['t1', theme]]));
+  eq(parseBackup(text).themes, [theme]);
+  eq(parseBackup(JSON.stringify({ app: 'planner', events: [], tasks: [] })).themes, []);
 });
 
 // ---- report

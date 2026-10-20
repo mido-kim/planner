@@ -152,4 +152,5 @@ Add these to `https://mido-kim.github.io/planner/?demo` (or
 - `&show=tasks` (agenda sheet over the month view on a phone), `&show=event` (editor with repeat
   options), `&show=deadline`, `&show=new-event`, `&show=create` (the
   event / deadline / task menu), `&show=delete` (this/following/all),
-  `&show=task`, `&show=labels`, `&show=settings`
+  `&show=task`, `&show=labels`, `&show=settings`, `&show=theme` (the theme
+  maker; the sample data has a saved dark theme, "Blueberry night")

@@ -23,4 +23,5 @@ export const icons = {
   dockRight: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M14 4v16"/>', 18),
   dockBottom: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 13h18"/>', 18),
   tag: svg('<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>', 16),
+  palette: svg('<path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 1.6-2.1-.4-1.2.4-2.4 1.7-2.4H18a3 3 0 0 0 3-3c0-5-4-10.5-9-10.5z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>', 16),
 };

@@ -23,6 +23,11 @@ export const DEFAULTS = {
   splitH: 0.5, // height at the bottom on a phone
   hideTasks: false, // hidden on a PC
   hideSplit: false, // hidden on a phone
+  // 'system' (light or dark, as the device is set), 'light', 'dark', 'custom'
+  // (made here and not saved: customTheme) or the id of a saved theme.
+  theme: 'system',
+  customTheme: null, // { base, vars }
+  themeCache: null, // { base, vars, css } of a made theme, for theme-boot.js
 };
 
 export function loadSettings() {

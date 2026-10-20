@@ -25,6 +25,12 @@ an app on a PC (Chrome) and an iPhone (Safari).
   it fills the lower half of the screen. Tasks with a date also show on the
   calendar, with a tick box.
 - **Gelato colors:** soft pastel colors throughout, in light and dark mode.
+- **Themes** (Settings → Appearance): System (light or dark as the device is
+  set), Light, Dark, or one you make. The theme maker has hue, saturation and
+  lightness sliders for every part (background, panels, lines, text, accent,
+  each item color and its text) and shows the change as you slide. Name a
+  theme to save it to your account for all your devices; each device picks
+  its own.
 - **Drag to move** events, deadlines and tasks to another time or day.
 - **Swipe** sideways through days and weeks, and up or down through the 2-week
   and month views a week at a time.
@@ -127,7 +133,7 @@ Netlify or Cloudflare Pages work too: drag this folder onto their upload page.
 
 Settings → Backup:
 
-- **Download backup (.json)** saves every event and task. **Restore from a
+- **Download backup (.json)** saves every event, task, label and saved theme. **Restore from a
   backup** loads one back in. Items in the backup replace their current
   versions, and anything added since stays.
 - **Export events for other calendars (.ics)** gives a file other calendar
@@ -141,12 +147,13 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 | File | What it does |
 |---|---|
 | `index.html`, `css/app.css` | Page and styles (light and dark) |
+| `js/themes.js`, `js/theme-boot.js` | Themes: built-in and made ones, applied before the page shows |
 | `js/main.js` | App startup, layout, navigation and input |
 | `js/views/timegrid.js` | Day / week timeline and the 2-week view |
 | `js/views/month.js` | Month grid |
 | `js/views/agenda.js` | Agenda (events, deadlines and tasks with details) |
 | `js/holidays.js` | Korean public holidays, 2026–2031 |
-| `js/dialogs.js` | Event, task, repeat-scope and settings dialogs |
+| `js/dialogs.js` | Event, task, repeat-scope, settings and theme maker dialogs |
 | `js/recurrence.js` | Repeat rules: occurrence dates, descriptions, iCalendar RRULE |
 | `js/series.js` | "This / this and following / all" edits and deletes |
 | `js/store.js` | Local storage, and the interface any storage must provide |

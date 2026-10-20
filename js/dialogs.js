@@ -2,6 +2,7 @@ import { absMin, addDays, dateOf, diffDays, dt, fmt, fromAbsMin, minOf, parseTim
 import { icons } from './icons.js';
 import { activeLabels, isRetired, retiredLabels, usageText } from './labels.js';
 import { describeRule, inLastWeekOfMonth, nthOf, ORDINALS, ruleKey, spanDays, WEEKDAYS, WEEKDAYS_SHORT } from './recurrence.js';
+import { AMOUNTS, hexToHsl, hslToHex, PARTS } from './themes.js';
 import { COLORS, esc } from './util.js';
 import { VERSION } from './version.js';
 
@@ -755,7 +756,7 @@ export function createMenu({ x, y, heading, choices }) {
 // ---------------------------------------------------------------- Settings
 
 // Changes apply as they're made through `onChange`; buttons call `actions`.
-export function settingsDialog({ settings, sync, lastBackup, labels, onChange, actions }) {
+export function settingsDialog({ settings, sync, lastBackup, labels, themes, onChange, actions }) {
   const hour = (h) => (settings.h24 ? `${String(h).padStart(2, '0')}:00` : `${h % 12 || 12} ${h < 12 || h === 24 ? 'AM' : 'PM'}`);
   const hours = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i)
     .map((h) => `<option value="${h}">${h === 24 ? `${hour(24)} (midnight)` : h > 24 ? `${hour(h - 24)} (next day)` : hour(h)}</option>`).join('');
@@ -769,6 +770,14 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
   <form class="dlg settings">
     <div class="dlg-head"><h2>Settings</h2><button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button></div>
     <div class="dlg-body">
+      <section>
+        <h3>Appearance</h3>
+        ${fieldRow('Theme', '<select name="theme"></select>')}
+        <div class="btn-row">
+          <button type="button" class="btn" data-act="makeTheme">${icons.palette}Make a theme…</button>
+          <button type="button" class="btn" data-act="editTheme">Edit this theme…</button>
+        </div>
+      </section>
       <section>
         <h3>Calendar</h3>
         ${fieldRow('Day starts at', `<select name="dayStart">${hours(0, 12)}</select>`)}
@@ -811,6 +820,20 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
     f.elements.showWork.checked = !!settings.showWork;
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
+    // Light, Dark, System, this device's unsaved theme, and the saved ones.
+    // Only made themes can be edited.
+    const editable = () => (f.querySelector('[data-act=editTheme]').hidden = ['system', 'light', 'dark'].includes(f.elements.theme.value));
+    const drawThemes = () => {
+      const saved = [...themes().values()].sort((a, b) => a.name.localeCompare(b.name));
+      const opt = (v, text) => `<option value="${esc(v)}">${esc(text)}</option>`;
+      f.elements.theme.innerHTML = opt('system', 'System (as this device is set)') + opt('light', 'Light') + opt('dark', 'Dark')
+        + (settings.customTheme ? opt('custom', 'Custom (this device only)') : '')
+        + (saved.length ? `<optgroup label="Your themes">${saved.map((t) => opt(t.id, t.name)).join('')}</optgroup>` : '');
+      f.elements.theme.value = settings.theme;
+      if (f.elements.theme.selectedIndex < 0) f.elements.theme.value = 'system';
+      editable();
+    };
+    drawThemes();
     const drawLabels = () => {
       const list = activeLabels(labels());
       f.querySelector('.label-preview').innerHTML = list.length
@@ -821,6 +844,7 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
     f.addEventListener('change', (e) => {
       if (e.target.name === 'restoreFile') return;
       onChange({
+        theme: f.elements.theme.value,
         dayStart: +f.elements.dayStart.value,
         dayEnd: +f.elements.dayEnd.value,
         weekStart: +f.elements.weekStart.value,
@@ -829,14 +853,16 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
         workEnd: +f.elements.workEnd.value,
         showWork: f.elements.showWork.checked,
       });
+      if (e.target.name === 'theme') editable();
     });
     f.addEventListener('submit', (e) => e.preventDefault());
     f.addEventListener('click', async (e) => {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'restore') f.elements.restoreFile.click();
-      else if (act === 'signOut') {
+      else if (act === 'signOut' || act === 'makeTheme' || act === 'editTheme') {
+        // The theme maker shows its changes on the app, so Settings closes.
         finish(null);
-        actions.signOut();
+        actions[act]();
       } else if (act === 'labels') {
         await actions.labels();
         drawLabels();
@@ -851,4 +877,124 @@ export function settingsDialog({ settings, sync, lastBackup, labels, onChange, a
       actions.restore(text);
     });
   }, { backdropCloses: true });
+}
+
+// ---------------------------------------------------------------- Theme maker
+
+// Every part of a theme with hue, saturation and lightness sliders. Changes
+// show on the app as they're made (`onPreview(vars)`). `presets` are themes
+// to start again from ({ key, label, vars }); `takenNames` the lowercase names
+// of other saved themes. Resolves with { action: 'done', name, vars },
+// { action: 'delete' } or null.
+export function themeMaker({ theme, presets, takenNames, canDelete, onPreview }) {
+  const CHANNELS = [['h', 'Hue', 360], ['s', 'Saturation', 100], ['l', 'Lightness', 100]];
+  const part = ([k, name]) => `
+    <div class="tm-part" data-key="${k}">
+      <button type="button" class="tm-row" aria-expanded="false"><i class="tm-sw"></i><span class="tm-name">${name}</span><code class="tm-val"></code></button>
+      <div class="tm-sliders" hidden>
+        ${CHANNELS.map(([c, label, max]) => `<label class="tm-slider"><span>${label}</span><input type="range" data-ch="${c}" min="0" max="${max}" step="1" aria-label="${name}: ${label}"></label>`).join('')}
+      </div>
+    </div>`;
+  const amount = ([k, name, min, max]) => `
+    <label class="tm-amount" data-key="${k}"><span class="tm-name">${name}</span><input type="range" min="${min}" max="${max}" step="${max <= 12 ? 0.5 : 1}" aria-label="${name}"><code class="tm-val"></code></label>`;
+  const html = `
+  <form class="dlg theme-maker" novalidate>
+    <div class="dlg-head"><h2>Theme maker</h2><button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button></div>
+    <div class="dlg-body">
+      <div class="tm-top">
+        <input name="name" placeholder="Name (to save it)" maxlength="40" autocomplete="off" aria-label="Theme name">
+        <select name="from" aria-label="Start again from"><option value="">Start from…</option>${presets.map((p) => `<option value="${esc(p.key)}">${esc(p.label)}</option>`).join('')}</select>
+      </div>
+      <p class="hint">With a name, it’s saved to your themes on all your devices. Without one, it’s used on this device only.</p>
+      <p class="form-error" role="alert" hidden></p>
+      ${PARTS.map(([group, parts]) => `<section class="tm-group"><h3>${group}</h3>${parts.map(part).join('')}</section>`).join('')}
+      <section class="tm-group"><h3>Amounts</h3>${AMOUNTS.map(amount).join('')}</section>
+    </div>
+    <div class="dlg-foot">
+      ${canDelete ? '<button type="button" class="btn danger-text" data-do="delete">Delete</button>' : ''}
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-cancel>Cancel</button>
+      <button type="submit" class="btn primary">Done</button>
+    </div>
+  </form>`;
+  return run('sheet theme-maker-dlg', html, (dlg, finish) => {
+    const f = dlg.querySelector('form');
+    const err = f.querySelector('.form-error');
+    f.elements.name.value = theme.name || '';
+    let vars = { ...theme.vars };
+    // Kept apart from the hex, so a gray's hue isn't lost along the way.
+    let hsl = {};
+
+    const drawPart = (el) => {
+      const k = el.dataset.key;
+      const { h, s, l } = hsl[k];
+      el.querySelector('.tm-sw').style.background = vars[k];
+      el.querySelector('.tm-val').textContent = vars[k].toUpperCase();
+      const track = {
+        // The hue bar always shows bright hues, so it's readable on dark colors.
+        h: `linear-gradient(to right, ${[0, 60, 120, 180, 240, 300, 360].map((x) => `hsl(${x} 75% 60%)`).join(', ')})`,
+        s: `linear-gradient(to right, hsl(${h} 0% ${l}%), hsl(${h} 100% ${l}%))`,
+        l: `linear-gradient(to right, #000, hsl(${h} ${s}% 50%), #fff)`,
+      };
+      for (const input of el.querySelectorAll('input[data-ch]')) {
+        input.value = Math.round(hsl[k][input.dataset.ch]);
+        input.style.background = track[input.dataset.ch];
+      }
+    };
+    const drawAmount = (el) => {
+      const input = el.querySelector('input');
+      input.value = vars[el.dataset.key];
+      el.querySelector('.tm-val').textContent = `${vars[el.dataset.key]}%`;
+    };
+    const drawAll = () => {
+      hsl = Object.fromEntries(PARTS.flatMap(([, parts]) => parts.map(([k]) => [k, hexToHsl(vars[k])])));
+      f.querySelectorAll('.tm-part').forEach(drawPart);
+      f.querySelectorAll('.tm-amount').forEach(drawAmount);
+    };
+    drawAll();
+
+    // One part open at a time.
+    f.addEventListener('click', (e) => {
+      const row = e.target.closest('.tm-row');
+      if (row) {
+        const open = row.getAttribute('aria-expanded') !== 'true';
+        f.querySelectorAll('.tm-row').forEach((r) => {
+          r.setAttribute('aria-expanded', String(open && r === row));
+          r.nextElementSibling.hidden = !(open && r === row);
+        });
+      } else if (e.target.closest('[data-do=delete]')) finish({ action: 'delete' });
+    });
+    f.addEventListener('input', (e) => {
+      const el = e.target.closest('.tm-part, .tm-amount');
+      if (!el) return;
+      const k = el.dataset.key;
+      if (el.classList.contains('tm-part')) {
+        hsl[k][e.target.dataset.ch] = +e.target.value;
+        vars[k] = hslToHex(hsl[k]);
+        drawPart(el);
+      } else {
+        vars[k] = +e.target.value;
+        drawAmount(el);
+      }
+      onPreview(vars);
+    });
+    f.elements.from.addEventListener('change', () => {
+      const p = presets.find((x) => x.key === f.elements.from.value);
+      f.elements.from.value = '';
+      if (!p) return;
+      vars = { ...p.vars };
+      drawAll();
+      onPreview(vars);
+    });
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = f.elements.name.value.trim();
+      if (name && takenNames.has(name.toLowerCase())) {
+        err.textContent = `There’s already a theme called “${name}”. Pick another name, or edit that one.`;
+        err.hidden = false;
+        return;
+      }
+      finish({ action: 'done', name, vars });
+    });
+  });
 }

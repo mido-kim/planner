@@ -5,10 +5,13 @@ import { isIOS } from './util.js';
 // Backups (.json, everything, restorable here) and .ics export (events and
 // deadlines, opens in Google Calendar, Apple Calendar, Outlook and others).
 
-export function backupFile(events, tasks, labels = new Map()) {
+export function backupFile(events, tasks, labels = new Map(), themes = new Map()) {
   const now = new Date();
   const text = JSON.stringify(
-    { app: 'planner', version: 1, exportedAt: now.toISOString(), events: [...events.values()], tasks: [...tasks.values()], labels: [...labels.values()] },
+    {
+      app: 'planner', version: 1, exportedAt: now.toISOString(),
+      events: [...events.values()], tasks: [...tasks.values()], labels: [...labels.values()], themes: [...themes.values()],
+    },
     null,
     1,
   );
@@ -28,9 +31,11 @@ export function parseBackup(text) {
   const okEvent = (e) => e && typeof e.id === 'string' && typeof e.start === 'string' && typeof e.end === 'string';
   const okTask = (t) => t && typeof t.id === 'string' && typeof t.title === 'string';
   const okLabel = (l) => l && typeof l.id === 'string' && typeof l.name === 'string';
-  // Backups from before 0.3.0 have no labels.
+  const okTheme = (t) => okLabel(t) && t.vars && typeof t.vars === 'object';
+  // Backups from before 0.3.0 have no labels, and from before 0.6.0 no themes.
   const labels = Array.isArray(d.labels) ? d.labels.filter(okLabel) : [];
-  return { exportedAt: d.exportedAt, events: d.events.filter(okEvent), tasks: d.tasks.filter(okTask), labels };
+  const themes = Array.isArray(d.themes) ? d.themes.filter(okTheme) : [];
+  return { exportedAt: d.exportedAt, events: d.events.filter(okEvent), tasks: d.tasks.filter(okTask), labels, themes };
 }
 
 const text = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');

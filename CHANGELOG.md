@@ -3,6 +3,19 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.6.0 (2026-10-20)
+
+- Themes: Settings → Appearance → Theme picks System (light or dark as your
+  phone or PC is set, as before), Light, Dark, or a theme you made.
+- Theme maker (Settings → Make a theme…): hue, saturation and lightness
+  sliders for each part (background, panels, buttons, lines, the three text
+  shades, overdue red, the accent and its text, switches, links, the now line,
+  and each item color with its text), plus how strong item fills, the today
+  highlight and the working-hours shade are. The app changes as you slide.
+  Give it a name to save it to your themes on all your devices; each device
+  keeps its own choice. Without a name it's used on that device only.
+- Saved themes are part of backups.
+
 ## 0.5.7 (2026-10-20)
 
 - New fonts: Korean letters are in 느좋체 everywhere, and all English letters

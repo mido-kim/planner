@@ -4,13 +4,14 @@ import {
   absMin, addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, fmtTime, fmtTimeRange, fromAbsMin, nowMin, parseTime, parts, shiftDays, startOfMonth,
   startOfWeek, timeValue, today,
 } from './dates.js';
-import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, taskEditor } from './dialogs.js';
+import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, taskEditor, themeMaker } from './dialogs.js';
 import { icons } from './icons.js';
 import { deleteLabelOps, labelUsage, setLabelStatusOps } from './labels.js';
 import { expand, spanDays } from './recurrence.js';
 import { deleteOps, isRepeating, masterOf, moveOps, saveOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
+import { applyTheme, baseOf, builtIn, cssVars } from './themes.js';
 import { $, esc, readJSON, uid, writeJSON } from './util.js';
 import { renderMonth } from './views/month.js';
 import { renderAgenda, tasksInView } from './views/agenda.js';
@@ -30,6 +31,7 @@ const state = {
   events: new Map(),
   tasks: new Map(),
   labels: new Map(),
+  themes: new Map(),
   pending: false,
   sheetOpen: false, // agenda over the month view on narrow screens
   monthGrid: null, // { from, weeks } once the month view is swiped a week up or down
@@ -41,6 +43,9 @@ let unsubscribe = null;
 let demo = false; // design preview: sample data, nothing saved
 let refreshOpenDialog = null; // redraws an open labels dialog when data changes
 let calObserver = null; // redraws the month grid when its space changes
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+const BUILT_IN = ['system', 'light', 'dark']; // themes that aren't made in the theme maker
+let shownTheme = ''; // what applyTheme last showed
 
 // Display settings are saved per device, except in the design preview.
 const persist = () => !demo && saveSettings(settings);
@@ -52,6 +57,8 @@ boot();
 async function boot() {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {});
   wireEvents();
+  showTheme();
+  darkQuery.addEventListener('change', () => settings.theme === 'system' && showTheme());
   // Text widths change once a web font arrives (the Korean one loads when
   // Korean text first shows), so the calendar is laid out again.
   document.fonts?.ready.then(() => store && fitText(app));
@@ -80,7 +87,10 @@ function start(s) {
     state.events = snap.events;
     state.tasks = snap.tasks;
     state.labels = snap.labels || new Map();
+    state.themes = snap.themes || new Map();
     state.pending = snap.pending;
+    keepThemeLook();
+    showTheme();
     render();
     refreshOpenDialog?.();
     if (first && store.kind === 'cloud') setTimeout(offerLocalCopy, 300);
@@ -111,6 +121,7 @@ async function startDemo(params) {
     case 'task': editTask(s.samples.task); break;
     case 'labels': manageLabels(); break;
     case 'settings': openSettings(); break;
+    case 'theme': openThemeMaker(false); break;
   }
 }
 
@@ -495,6 +506,82 @@ function labelAction(type, p) {
       return commit(deleteLabelOps(p.id, state.events, state.tasks), `Deleted “${label.name}” and its items`);
   }
   return Promise.resolve();
+}
+
+// ---------------------------------------------------------------- Themes
+
+// What this device shows: { base, vars }, with vars only for a made theme.
+function chosenTheme() {
+  const t = settings.theme;
+  if (t === 'light' || t === 'dark') return { base: t };
+  if (t === 'custom' && settings.customTheme) return settings.customTheme;
+  const saved = state.themes.get(t);
+  if (saved) return { base: saved.base, vars: saved.vars };
+  // A saved theme before the data has arrived: the look it had last time.
+  if (t !== 'system' && settings.themeCache) return settings.themeCache;
+  return { base: darkQuery.matches ? 'dark' : 'light' };
+}
+
+// Shows the chosen theme, or `preview` while the theme maker is open.
+function showTheme(preview) {
+  const { base, vars } = preview || chosenTheme();
+  const css = vars ? cssVars(base, vars) : null;
+  const key = JSON.stringify([base, css]);
+  if (key === shownTheme) return;
+  shownTheme = key;
+  applyTheme(base, css);
+  if (preview) return;
+  // Saved for theme-boot.js, which shows it before the app loads next time.
+  settings.themeCache = vars ? { base, vars, css } : null;
+  persist();
+}
+
+// If the saved theme this device shows was deleted (maybe on another device),
+// the device keeps its look as its own unsaved theme.
+function keepThemeLook() {
+  const t = settings.theme;
+  if (BUILT_IN.includes(t) || t === 'custom' || state.themes.has(t)) return;
+  const c = settings.themeCache;
+  settings = { ...settings, theme: c ? 'custom' : 'system', customTheme: c ? { base: c.base, vars: c.vars } : settings.customTheme };
+  persist();
+}
+
+// `edit`: change the saved theme in use rather than make a new one from it.
+async function openThemeMaker(edit) {
+  const saved = edit ? state.themes.get(settings.theme) : null;
+  const now = chosenTheme();
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const res = await themeMaker({
+    theme: saved ? { name: saved.name, vars: saved.vars } : { name: '', vars: now.vars || builtIn(now.base) },
+    presets: [
+      { key: 'light', label: 'Light', vars: builtIn('light') },
+      { key: 'dark', label: 'Dark', vars: builtIn('dark') },
+      ...[...state.themes.values()].sort(byName).map((t) => ({ key: t.id, label: t.name, vars: t.vars })),
+    ],
+    takenNames: new Set([...state.themes.values()].filter((t) => t !== saved).map((t) => t.name.trim().toLowerCase())),
+    canDelete: !!saved,
+    onPreview: (vars) => showTheme({ base: baseOf(vars), vars }),
+  });
+  if (res?.action === 'done') {
+    const base = baseOf(res.vars);
+    if (res.name) {
+      const at = Date.now();
+      const obj = saved
+        ? { ...saved, name: res.name, base, vars: res.vars, updatedAt: at }
+        : { id: uid(), name: res.name, base, vars: res.vars, createdAt: at, updatedAt: at };
+      await commit([{ op: 'put', coll: 'themes', obj }]);
+      settings = { ...settings, theme: obj.id };
+    } else {
+      settings = { ...settings, theme: 'custom', customTheme: { base, vars: res.vars } };
+    }
+    persist();
+  } else if (res?.action === 'delete') {
+    settings = { ...settings, theme: 'system' };
+    persist();
+    await commit([{ op: 'remove', coll: 'themes', id: saved.id }], `Deleted the theme “${saved.name}”`);
+  }
+  showTheme();
+  openSettings();
 }
 
 // ---------------------------------------------------------------- Navigation
@@ -1353,8 +1440,10 @@ function openSettings() {
     sync: { kind: store.kind, email: store.email },
     lastBackup: readJSON(BACKUP_KEY, {}).last,
     labels: () => state.labels,
+    themes: () => state.themes,
     onChange: (changes) => {
       settings = { ...settings, ...changes };
+      showTheme();
       if (settings.dayEnd <= settings.dayStart) settings.dayEnd = Math.min(24, settings.dayStart + 1);
       if (settings.workEnd <= settings.workStart) settings.workEnd = Math.min(24, settings.workStart + 1);
       persist();
@@ -1365,13 +1454,15 @@ function openSettings() {
       ics: () => saveFile('planner-events.ics', icsFile(state.events, state.labels), 'text/calendar'),
       restore: restoreBackup,
       labels: manageLabels,
+      makeTheme: () => openThemeMaker(false),
+      editTheme: () => openThemeMaker(true),
       signOut: () => cloud?.signOut(),
     },
   });
 }
 
 async function doBackup() {
-  const { name, text } = backupFile(state.events, state.tasks, state.labels);
+  const { name, text } = backupFile(state.events, state.tasks, state.labels, state.themes);
   if (await saveFile(name, text, 'application/json')) {
     writeJSON(BACKUP_KEY, { ...readJSON(BACKUP_KEY, {}), last: Date.now() });
     updateBanner();
@@ -1388,12 +1479,14 @@ function restoreBackup(text) {
   }
   const when = data.exportedAt ? ` from ${new Date(data.exportedAt).toLocaleDateString()}` : '';
   const labels = data.labels.length ? `, ${data.tasks.length} tasks and ${data.labels.length} labels` : ` and ${data.tasks.length} tasks`;
-  const ok = confirm(`Restore ${data.events.length} events${labels}${when}?\n\nItems in the backup replace their current versions. Anything added since the backup stays.`);
+  const themes = data.themes.length ? ` (and ${data.themes.length} themes)` : '';
+  const ok = confirm(`Restore ${data.events.length} events${labels}${themes}${when}?\n\nItems in the backup replace their current versions. Anything added since the backup stays.`);
   if (!ok) return;
   commit([
     ...data.events.map((obj) => ({ op: 'put', coll: 'events', obj })),
     ...data.tasks.map((obj) => ({ op: 'put', coll: 'tasks', obj })),
     ...data.labels.map((obj) => ({ op: 'put', coll: 'labels', obj })),
+    ...data.themes.map((obj) => ({ op: 'put', coll: 'themes', obj })),
   ], 'Backup restored');
 }
 
@@ -1406,12 +1499,14 @@ function offerLocalCopy() {
   const events = Object.values(local.events);
   const tasks = Object.values(local.tasks);
   const labels = Object.values(local.labels);
+  const themes = Object.values(local.themes);
   if (!events.length && !tasks.length) return;
   if (confirm(`This device has ${events.length} events and ${tasks.length} tasks from before sync was turned on. Copy them to your account?`)) {
     commit([
       ...events.map((obj) => ({ op: 'put', coll: 'events', obj })),
       ...tasks.map((obj) => ({ op: 'put', coll: 'tasks', obj })),
       ...labels.map((obj) => ({ op: 'put', coll: 'labels', obj })),
+      ...themes.map((obj) => ({ op: 'put', coll: 'themes', obj })),
     ]);
   }
 }

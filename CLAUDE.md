@@ -59,6 +59,13 @@ and setup, CHANGELOG.md for history.
   stack; `--font-item` (item names, selector list under "Base") is the same
   for now. main.js re-renders on `document.fonts` `loadingdone`, since the
   Korean font only loads once Korean text shows.
+- Themes: `js/themes.js` (parts, color math, `builtIn` reads Light/Dark from
+  the CSS, `cssVars`, `applyTheme`), `js/theme-boot.js` (classic script in
+  `<head>`: sets `data-theme` / the cached variables before first paint).
+  `css/app.css` has Light on `:root` and Dark on `:root[data-theme="dark"]`;
+  never use `prefers-color-scheme` in CSS. main.js `showTheme` /
+  `chosenTheme` / `openThemeMaker`; `settings.theme` is per device ('system',
+  'light', 'dark', 'custom' or a saved theme id).
 - `sw.js`: offline cache. **Add any new file to `SHELL`.**
 - `js/demo.js`: design preview (`?demo`), in-memory sample data. DESIGN.md has
   the Figma workflow, layer names and the URL options.
@@ -89,11 +96,15 @@ Task: `{ id, title, notes, due, dueTime, labelId, color, done, doneAt,
 createdAt, updatedAt }`.
 
 Label: `{ id, name, color, status: 'active' | 'retired', createdAt, updatedAt }`.
+
+Theme: `{ id, name, base: 'light' | 'dark', vars, createdAt, updatedAt }`;
+`vars` maps each part's CSS variable name (without `--`) to '#rrggbb', plus
+`fill`, `today-tint`, `work` in percent (see `PARTS` / `AMOUNTS`).
 An item's `color` is null when it follows its label (`colorOf` in labels.js).
 Missing fields mean their default (older data has none of the new ones).
 
 Firestore paths: `users/{uid}/events/{id}`, `users/{uid}/tasks/{id}`,
-`users/{uid}/labels/{id}`.
+`users/{uid}/labels/{id}`, `users/{uid}/themes/{id}`.
 Display settings are per device in localStorage (`js/settings.js`).
 
 ## Working here
