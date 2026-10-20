@@ -293,7 +293,7 @@ test('.ics export names the label as a category', () => {
 });
 
 // ---- agenda
-test('agenda: overdue first, then each day in time order, date-only tasks last, then undated', () => {
+test('agenda: overdue first, then each day in time order, date-only tasks last, then undated; what is over only when asked', () => {
   const evs = [
     ev({ id: 'trip', allDay: true, start: '2026-10-13', end: '2026-10-14', title: 'Trip' }),
     ev({ id: 'late', start: '2026-10-12T22:00', end: '2026-10-13T01:00', title: 'Late' }), // started before the range
@@ -308,14 +308,21 @@ test('agenda: overdue first, then each day in time order, date-only tasks last, 
     { id: 'gone', title: 'Done', due: '2026-10-14', done: true },
     { id: 'free', title: 'Someday', due: null, done: false },
   ];
-  const { groups, hiddenDone } = agendaGroups({ from: '2026-10-13', to: '2026-10-15', occs, tasks, showDone: false, t: '2026-10-14' });
+  const all = agendaGroups({ from: '2026-10-13', to: '2026-10-15', occs, tasks, showPast: true, t: '2026-10-14', now: '2026-10-14T09:30' });
   const ids = (g) => g.items.map((x) => (x.occ ? x.occ.ev.id : x.task.id));
-  eq(groups.map((g) => g.kind + (g.day ? ' ' + g.day : '')), ['overdue', 'day 2026-10-13', 'day 2026-10-14', 'nodate']);
-  eq(ids(groups[0]), ['old']);
-  eq(ids(groups[1]), ['trip', 'late']);
-  eq(ids(groups[2]), ['trip', 'due', 'meet', 'nine', 'any']);
-  eq(ids(groups[3]), ['free']);
-  eq(hiddenDone, 1);
+  const kinds = (gs) => gs.map((g) => g.kind + (g.day ? ' ' + g.day : ''));
+  eq(kinds(all.groups), ['overdue', 'day 2026-10-13', 'day 2026-10-14', 'nodate']);
+  eq(ids(all.groups[0]), ['old']);
+  eq(ids(all.groups[1]), ['trip', 'late']);
+  eq(ids(all.groups[2]), ['trip', 'due', 'meet', 'nine', 'any', 'gone']);
+  eq(ids(all.groups[3]), ['free']);
+  eq(all.hidden, 0);
+  // At 9:30, yesterday, the 8:00 deadline and the done task are left out;
+  // the trip still shows today, and the 9:00 meeting is still on.
+  const ahead = agendaGroups({ from: '2026-10-13', to: '2026-10-15', occs, tasks, showPast: false, t: '2026-10-14', now: '2026-10-14T09:30' });
+  eq(kinds(ahead.groups), ['overdue', 'day 2026-10-14', 'nodate']);
+  eq(ids(ahead.groups[1]), ['trip', 'meet', 'nine', 'any']);
+  eq(ahead.hidden, 3); // late, due, gone
 });
 
 // ---- the day running past midnight

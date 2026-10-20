@@ -19,8 +19,9 @@ an app on a PC (Chrome) and an iPhone (Safari).
   months or years. A repeat can end never, on a date, or after N times.
 - **Edit or delete** one occurrence, this and following, or all events, with
   Undo after deleting.
-- **Agenda** with the full details of every event, deadline and task in the
-  dates on screen, plus overdue tasks and tasks with no date. On a PC it sits
+- **Agenda** with the full details of every event, deadline and task still
+  ahead in the dates on screen, plus overdue tasks and tasks with no date
+  (what's over and done tasks are a tap away at the bottom). On a PC it sits
   at the right or the bottom (drag its edge to resize, or hide it); on a phone
   it fills the lower half of the screen. Tasks with a date also show on the
   calendar, with a tick box.
@@ -33,7 +34,9 @@ an app on a PC (Chrome) and an iPhone (Safari).
   its own.
 - **Drag to move** events, deadlines and tasks to another time or day.
 - **Swipe** sideways through days and weeks, and up or down through the 2-week
-  and month views a week at a time.
+  and month views a week at a time. On a PC the mouse wheel does the same over
+  the calendar: tilt it (or hold Shift) for days and weeks, roll it for the
+  2-week and month views.
 - **Korean public holidays** (2026–2031) built in; working hours are lightly
   shaded on the other weekdays.
 - **Works offline.** Optional sync between devices through Firebase.

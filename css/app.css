@@ -267,7 +267,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
 }
-.today-btn { grid-area: today; }
+.today-btn { grid-area: today; width: 40px; padding: 0; }
 .arrows { grid-area: arrows; display: flex; }
 .title-wrap { grid-area: title; position: relative; min-width: 0; padding-left: 6px; }
 .seg { grid-area: seg; }
@@ -382,7 +382,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 @media (max-width: 380px) {
   .seg button { padding: 0 7px; }
-  .today-btn { padding: 0 10px; }
+  .today-btn { width: 34px; }
   .topbar { column-gap: 4px; }
   .new-group .nb { width: 30px; }
 }

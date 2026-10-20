@@ -22,6 +22,8 @@ const BACKUP_KEY = 'planner.backup.v1'; // { last, snoozeUntil, firstSeen } for 
 const WIDE = 900; // at this width and up, the agenda can sit beside the calendar
 const DEADLINE_TIME = 23 * 60 + 59; // a new deadline without a picked time is due at 11:59 PM
 const LONG_PRESS_MS = 450; // on touch screens, hold this long to start selecting
+const WHEEL_STEP_PX = 40; // a mouse wheel moves the calendar after this much scrolling
+const WHEEL_GAP_MS = 300; // and then waits this long before it moves again
 
 const app = $('#app');
 let settings = loadSettings();
@@ -35,7 +37,7 @@ const state = {
   pending: false,
   sheetOpen: false, // agenda over the month view on narrow screens
   monthGrid: null, // { from, weeks } once the month view is swiped a week up or down
-  showDone: false,
+  showPast: false, // agenda: also events that are over and done tasks
 };
 let store = null;
 let cloud = null;
@@ -134,7 +136,7 @@ function showMessage(text) {
 function renderShell() {
   app.innerHTML = `
   <header class="topbar">
-    <button class="btn today-btn" data-action="today">Today</button>
+    <button class="btn today-btn" data-action="today" aria-label="Today" title="Today (T)">${icons.home}</button>
     <div class="arrows">
       <button class="icon-btn" data-action="prev" aria-label="Previous">${icons.prev}</button>
       <button class="icon-btn" data-action="next" aria-label="Next">${icons.next}</button>
@@ -372,7 +374,7 @@ function renderTasks(r, rangeChanged, occs = occurrencesIn(r.from, r.to)) {
       : state.view === 'day' ? fmt(r.from, { weekday: 'long', month: 'short', day: 'numeric' })
         : spanLabel(r.from, addDays(r.to, -1));
   $('#task-list').innerHTML = renderAgenda({
-    from: r.from, to: r.to, occs, tasks: state.tasks, events: state.events, labels: state.labels, h24: settings.h24, showDone: state.showDone,
+    from: r.from, to: r.to, occs, tasks: state.tasks, events: state.events, labels: state.labels, h24: settings.h24, showPast: state.showPast,
   });
   // New tasks default to today if it's on screen, else the picked day.
   const due = $('#task-add').elements.due;
@@ -744,8 +746,8 @@ const actions = {
   'new-event': () => newEvent(state.date),
   'new-deadline': () => newDeadline(defaultDay()),
   'new-task': () => newTask(defaultDay()),
-  'toggle-done': () => {
-    state.showDone = !state.showDone;
+  'toggle-past': () => {
+    state.showPast = !state.showPast;
     renderTasks(viewRange(), false);
   },
   settings: openSettings,
@@ -1167,6 +1169,32 @@ function wireSwipes() {
     if (sw?.on) springBack(sw);
     sw = null;
   });
+
+  // A mouse wheel does the same over the calendar: tilted (or with Shift)
+  // through days and weeks, up and down through the 2-week and month views a
+  // week at a time. One step per notch, and at most one per WHEEL_GAP_MS, so
+  // a long spin or a trackpad's glide doesn't race ahead.
+  let acc = 0;
+  let next = 0;
+  let quiet;
+  app.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || sel || mv || !e.target.closest('#cal')) return;
+    const axis = state.view === 'day' || state.view === 'week' ? 'x' : 'y';
+    const [along, across] = axis === 'x' ? [e.deltaX, e.deltaY] : [e.deltaY, e.deltaX];
+    // The other direction is left alone (a day too tall to fit still scrolls).
+    if (Math.abs(along) <= Math.abs(across)) return;
+    e.preventDefault();
+    clearTimeout(quiet);
+    quiet = setTimeout(() => (acc = 0), 200);
+    if (performance.now() < next) return;
+    acc += along * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 800 : 1); // lines or pages → pixels
+    if (Math.abs(acc) < WHEEL_STEP_PX) return;
+    const dir = Math.sign(acc);
+    acc = 0;
+    next = performance.now() + WHEEL_GAP_MS;
+    if (axis === 'x') move(dir);
+    else shiftWeek(dir);
+  }, { passive: false });
 }
 
 function wireGestures() {

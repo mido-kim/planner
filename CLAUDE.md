@@ -29,7 +29,9 @@ and setup, CHANGELOG.md for history.
 - The day can run past midnight (`settings.dayEnd` up to 28 = 4 AM):
   `slotOf` in timegrid.js puts the small hours in the previous day's column.
 - main.js has swipes (`wireSwipes`: day/week sideways via `move`, 2-week and
-  month by a week via `shiftWeek`; a swiped month keeps `state.monthGrid`).
+  month by a week via `shiftWeek`; a swiped month keeps `state.monthGrid`),
+  and the mouse wheel does the same there (one step per `WHEEL_STEP_PX`, at
+  most one per `WHEEL_GAP_MS`).
 - main.js `arrangeLabels` runs after each calendar render: moves task and
   deadline names in a day up or down (`translateY`) until none overlap each
   other or an event's text (the latter only within `NEAR_PX`), timed ones

@@ -1,12 +1,13 @@
-import { addDays, dateOf, fmt, fmtTime, fmtTimeRange, minOf, parseTime, today } from '../dates.js';
+import { addDays, dateOf, dt, fmt, fmtTime, fmtTimeRange, minOf, nowMin, parseTime, today } from '../dates.js';
 import { icons } from '../icons.js';
 import { colorOf } from '../labels.js';
 import { describeRule, spanDays } from '../recurrence.js';
 import { esc } from '../util.js';
 
-// The agenda beside or below the calendar: everything in the dates on screen
-// (events, deadlines and tasks) day by day with their full details, plus
-// overdue tasks and tasks with no date.
+// The agenda beside or below the calendar: what's still ahead in the dates on
+// screen (events, deadlines and tasks) day by day with their full details,
+// plus overdue tasks and tasks with no date. Events that are over and done
+// tasks only show when asked for (`showPast`).
 
 // Open tasks counted on the agenda button.
 export function tasksInView(tasks, from, to) {
@@ -19,17 +20,18 @@ export function tasksInView(tasks, from, to) {
 const TYPE_ORDER = { event: 0, deadline: 1, task: 2 };
 
 // Which items go under which heading, in order:
-//   { groups: [{ kind: 'overdue' | 'day' | 'nodate', day?, items }], hiddenDone }
+//   { groups: [{ kind: 'overdue' | 'day' | 'nodate', day?, items }], hidden }
 // Items are { type: 'event' | 'deadline' | 'task', occ | task }. All-day
 // events show on each day they cover; timed events on the day they start
-// (or the first day shown, if they started before it); done tasks only with
-// `showDone`.
-export function agendaGroups({ from, to, occs, tasks, showDone, t = today() }) {
+// (or the first day shown, if they started before it). Unless `showPast`,
+// events and deadlines that are over by `now` ('YYYY-MM-DDTHH:mm') and done
+// tasks are left out; `hidden` counts them.
+export function agendaGroups({ from, to, occs, tasks, showPast, t = today(), now = dt(t, nowMin()) }) {
   const groups = [];
-  let hiddenDone = 0;
+  let hiddenTasks = 0;
   const keep = (x) => {
-    if (x.done && !showDone) hiddenDone++;
-    return !x.done || showDone;
+    if (x.done && !showPast) hiddenTasks++;
+    return !x.done || showPast;
   };
   if (t >= from && t < to) {
     const overdue = tasks.filter((x) => !x.done && x.due && x.due < from).sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0));
@@ -37,15 +39,23 @@ export function agendaGroups({ from, to, occs, tasks, showDone, t = today() }) {
   }
   const days = new Map();
   for (let d = from; d < to; d = addDays(d, 1)) days.set(d, []);
+  const shown = new Set();
+  const left = new Set();
+  // An all-day event is over once its day is; a timed one at its end.
+  const add = (day, item, over) => {
+    if (over && !showPast) return left.add(item.occ);
+    shown.add(item.occ);
+    days.get(day)?.push(item);
+  };
   for (const occ of occs) {
     if (occ.ev.kind === 'deadline' && occ.ev.allDay) {
-      days.get(occ.date)?.push({ type: 'deadline', occ, sort: 1440 }); // due that day: at its end
+      add(occ.date, { type: 'deadline', occ, sort: 1440 }, occ.date < t); // due that day: at its end
     } else if (occ.ev.allDay) {
       const last = addDays(occ.date, spanDays(occ.ev));
-      for (let d = occ.date < from ? from : occ.date; d <= last && d < to; d = addDays(d, 1)) days.get(d)?.push({ type: 'event', occ, sort: -2 }); // all-day first
+      for (let d = occ.date < from ? from : occ.date; d <= last && d < to; d = addDays(d, 1)) add(d, { type: 'event', occ, sort: -2 }, d < t); // all-day first
     } else {
       const d = occ.date < from ? from : occ.date;
-      days.get(d)?.push({ type: occ.ev.kind === 'deadline' ? 'deadline' : 'event', occ, sort: occ.date < from ? -1 : minOf(occ.start) });
+      add(d, { type: occ.ev.kind === 'deadline' ? 'deadline' : 'event', occ, sort: occ.date < from ? -1 : minOf(occ.start) }, occ.end <= now);
     }
   }
   for (const task of tasks) {
@@ -59,12 +69,13 @@ export function agendaGroups({ from, to, occs, tasks, showDone, t = today() }) {
   }
   const undated = tasks.filter((x) => !x.due && keep(x)).sort((a, b) => a.done - b.done || (a.createdAt || 0) - (b.createdAt || 0));
   if (undated.length) groups.push({ kind: 'nodate', items: undated.map((task) => ({ type: 'task', task, sort: 0 })) });
-  return { groups, hiddenDone };
+  // An event shown on a later day isn't counted as left out.
+  return { groups, hidden: hiddenTasks + [...left].filter((occ) => !shown.has(occ)).length };
 }
 
-export function renderAgenda({ from, to, occs, tasks, events, labels = new Map(), h24, showDone }) {
+export function renderAgenda({ from, to, occs, tasks, events, labels = new Map(), h24, showPast }) {
   const t = today();
-  const { groups, hiddenDone } = agendaGroups({ from, to, occs, tasks: [...tasks.values()], showDone, t });
+  const { groups, hidden } = agendaGroups({ from, to, occs, tasks: [...tasks.values()], showPast, t });
   const short = (d) => fmt(d, { month: 'short', day: 'numeric' });
 
   const labelTag = (item) => {
@@ -147,8 +158,8 @@ export function renderAgenda({ from, to, occs, tasks, events, labels = new Map()
   const body = groups.length
     ? groups.map((g) => `<section class="tgroup ${g.kind === 'day' && g.day === t ? 'today' : g.kind}"><h3>${esc(heading(g))}</h3>${g.items.map((x) => card(x, g)).join('')}</section>`).join('')
     : '<p class="empty">Nothing planned for these dates.</p>';
-  const foot = hiddenDone
-    ? `<button class="link" data-action="toggle-done">Show ${hiddenDone} completed</button>`
-    : showDone ? '<button class="link" data-action="toggle-done">Hide completed</button>' : '';
+  const foot = hidden
+    ? `<button class="link" data-action="toggle-past">Show ${hidden} past or completed</button>`
+    : showPast ? '<button class="link" data-action="toggle-past">Hide past and completed</button>' : '';
   return body + (foot ? `<div class="tasks-foot">${foot}</div>` : '');
 }

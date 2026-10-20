@@ -4,6 +4,7 @@ const svg = (paths, size = 20) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
 
 export const icons = {
+  home: svg('<path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/>'),
   prev: svg('<path d="M15 18l-6-6 6-6"/>'),
   next: svg('<path d="M9 18l6-6-6-6"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),

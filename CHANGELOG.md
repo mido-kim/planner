@@ -3,6 +3,18 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.6.1 (2026-10-20)
+
+- The agenda only shows what's still ahead: events that are over (earlier
+  days, and earlier today once they've ended) and done tasks are left out.
+  "Show N past or completed" at the bottom brings them back. Overdue tasks
+  still show.
+- Mouse wheel on a PC, like swiping on the phone: over the calendar, tilt the
+  wheel (or hold Shift and roll) to go to the next or previous day or week;
+  roll it up or down in the 2-week and month views to move a week. One step
+  per notch, with a short pause between steps so it doesn't race ahead.
+- The Today button is a house icon now.
+
 ## 0.6.0 (2026-10-20)
 
 - Themes: Settings → Appearance → Theme picks System (light or dark as your
