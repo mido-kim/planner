@@ -3,6 +3,17 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.10.1 (2026-10-27)
+
+- Sticker sizes are smaller: Large is what Medium was, Medium what Small was,
+  and Small smaller again.
+- Tap a stuck sticker to pick it, as in PowerPoint: it gets a dashed outline
+  and a round handle above it. Drag the handle to turn the sticker, in steps
+  of 15°. A small bar under it has S, M, L and Remove (Delete or Backspace
+  removes it on a PC too). Tap anywhere else to let go.
+- A picked sticker moves at once when dragged with a finger, without holding
+  first. Turned stickers stay turned when moved.
+
 ## 0.10.0 (2026-10-27)
 
 - An event's notes show inside its box on the day, week and 2-week views, in

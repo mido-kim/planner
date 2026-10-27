@@ -70,7 +70,10 @@ and setup, CHANGELOG.md for history.
   month weeks, in the grid; a glide mover) after every calendar render,
   `anchorAt` turns a drop point into a placement (asks `askScope('sticker')`
   on a repeating event), `wireStickers` drags (tray: right away; stuck: mouse
-  right away, touch after LONG_PRESS_MS) and the tap menu. Event notes:
+  right away, touch after LONG_PRESS_MS, or at once when picked). A tap
+  picks one (`pickedSticker`: `.stk.picked` with a `.stk-rot` handle, and the
+  fixed `#stk-bar` by `placeBar` with sizes and Remove); dragging the handle
+  (`turn`) sets `rot` in 15° steps. Event notes:
   `.ev-n` in timegrid.js blocks, fitted to whole lines in `fitText`.
 - `js/symbols.js`: the check-off symbols (outline → filled; parts `s` / `d` /
   `k` in each SVG, styled in css under `.sym`), `symbolOf` (event's own, its

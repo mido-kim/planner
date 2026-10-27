@@ -13,6 +13,8 @@
 //           is, for an event that runs past midnight;
 //   'month' on the month view's day `date`, `fx` and `fy` across and down its
 //           box.
+// `rot` is how far it's turned, clockwise in degrees (steps of 15; none if
+// missing).
 // A timeline sticker is so many hours tall, so it grows and shrinks with the
 // events and keeps its place among them in every timeline view. A month
 // sticker goes with the size of the day boxes and shows only in the month
@@ -23,8 +25,8 @@ export const BUILT_IN = [
 ];
 
 export const SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
-const HOURS = { s: 1, m: 2, l: 3.5 }; // timelines: how many hours tall
-const CELL = { s: 0.35, m: 0.55, l: 0.85 }; // month: share of a day box's height
+const HOURS = { s: 0.6, m: 1, l: 2 }; // timelines: how many hours tall
+const CELL = { s: 0.22, m: 0.35, l: 0.55 }; // month: share of a day box's height
 
 // Width and height on screen: `unit` is an hour (timelines) or a day box's
 // height (month), in pixels. The longer side gets the size.

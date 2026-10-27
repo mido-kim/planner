@@ -183,7 +183,8 @@ function renderShell() {
     </aside>
   </div>
   <div class="banner" id="banner" hidden></div>
-  <div class="stk-tray" id="stk-tray" role="dialog" aria-label="Stickers" hidden></div>`;
+  <div class="stk-tray" id="stk-tray" role="dialog" aria-label="Stickers" hidden></div>
+  <div class="stk-bar" id="stk-bar" role="toolbar" aria-label="Sticker" hidden></div>`;
   calObserver?.disconnect();
   calObserver?.observe($('#cal'));
 }
@@ -1457,13 +1458,17 @@ function wireGestures() {
 // timeline, it goes with that event (on a repeating one you're asked: that
 // day only, or that day and every later one); anywhere else it stays at that
 // day and time, or on that day in the month view. A stuck sticker moves by
-// dragging it (on a touch screen, hold it first); a tap offers its sizes and
-// Remove.
+// dragging it (on a touch screen, hold it first). A tap picks it, as in
+// PowerPoint: an outline, a handle above it to turn it (in steps of 15°) and a
+// bar below with its sizes and Remove; while picked, a finger moves it
+// without holding first.
 
 const allStickers = () => new Map([...STOCK_STICKERS, ...state.stickers.values()].map((x) => [x.id, x]));
 let trayOpen = false;
 let trayEdit = false; // stickers you made show a × to delete them
 let stk = null; // a sticker being dragged (from the tray, or one stuck on)
+let pickedSticker = null; // the placement tapped last, while it shows its handle and bar
+let turn = null; // a picked sticker being turned by its handle
 
 function toggleTray(open = !trayOpen) {
   trayOpen = open;
@@ -1493,7 +1498,7 @@ function drawTray() {
       ${[...STOCK_STICKERS.map((x) => pick(x, false)), ...own.map((x) => pick(x, true))].join('')}
       <label class="stk-add" title="Make a sticker from a picture"><input type="file" accept="image/*" hidden>${icons.plus}<span>Add</span></label>
     </div>
-    <p class="stk-tip">${trayEdit ? 'Tap × to delete a sticker you made.' : 'Drag a sticker onto the calendar. Tap a stuck one to resize or remove it.'}</p>`;
+    <p class="stk-tip">${trayEdit ? 'Tap × to delete a sticker you made.' : 'Drag a sticker onto the calendar. Tap a stuck one to turn, resize or remove it.'}</p>`;
 }
 
 async function addSticker(file) {
@@ -1520,7 +1525,13 @@ function drawStickers(cal) {
   const placed = [...state.placements.values()].filter((p) => pics.has(p.stickerId));
   const H0 = settings.dayStart * 60;
   const H1 = settings.dayEnd * 60;
-  const img = (p, x, y, [w, h]) => `<img class="stk" src="${esc(pics.get(p.stickerId).src)}" data-p="${esc(p.id)}" alt="" draggable="false" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px">`;
+  const img = (p, x, y, [w, h]) => {
+    const picked = p.id === pickedSticker;
+    // Near the top there's no room for the handle above, so it goes below.
+    const cls = ['stk', picked && 'picked', picked && y - h / 2 < 40 && 'rot-below'].filter(Boolean).join(' ');
+    const handle = picked ? `<span class="stk-rot" role="button" aria-label="Turn the sticker" title="Drag to turn">${icons.rotate}</span>` : '';
+    return `<div class="${cls}" data-p="${esc(p.id)}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;--rot:${p.rot || 0}deg"><img src="${esc(pics.get(p.stickerId).src)}" alt="" draggable="false">${handle}</div>`;
+  };
   for (const layer of layers) {
     const host = layer.parentElement;
     const box = layer.getBoundingClientRect();
@@ -1558,6 +1569,46 @@ function drawStickers(cal) {
     }
     layer.innerHTML = html.join('');
   }
+  placeBar();
+}
+
+function pickSticker(id) {
+  pickedSticker = id;
+  drawStickers($('#cal'));
+}
+
+function unpickSticker() {
+  if (!pickedSticker) return;
+  pickedSticker = null;
+  const el = $('#cal .stk.picked');
+  el?.classList.remove('picked', 'rot-below');
+  el?.querySelector('.stk-rot')?.remove();
+  placeBar();
+}
+
+// The picked sticker's bar: its sizes and Remove, below it (above when its
+// handle is below, or near the bottom of the screen). Hidden when nothing is
+// picked, or the picked one isn't on screen.
+function placeBar() {
+  const bar = $('#stk-bar');
+  if (!bar) return;
+  const el = pickedSticker && $(`#cal .stk[data-p="${CSS.escape(pickedSticker)}"]`);
+  const p = el && state.placements.get(pickedSticker);
+  bar.hidden = !p;
+  if (!p) {
+    if (pickedSticker && !el) pickedSticker = null;
+    return;
+  }
+  bar.innerHTML = SIZES.map(([k, name]) => `<button type="button" data-stk-sz="${k}" aria-pressed="${(p.size || 'm') === k}" title="${name}">${name[0]}</button>`).join('')
+    + `<button type="button" class="stk-bar-rm" data-stk-rm aria-label="Remove the sticker" title="Remove">${icons.trash}</button>`;
+  const r = el.getBoundingClientRect();
+  const b = bar.getBoundingClientRect();
+  const handleAbove = !el.classList.contains('rot-below');
+  const below = handleAbove && r.bottom + 12 + b.height < innerHeight - 8;
+  // Above, it clears the handle when that's above too.
+  const top = below ? r.bottom + 12 : r.top - 12 - b.height - (handleAbove ? 40 : 0);
+  bar.style.left = `${Math.min(Math.max(r.left + r.width / 2 - b.width / 2, 8), innerWidth - b.width - 8)}px`;
+  bar.style.top = `${Math.min(Math.max(top, 8), innerHeight - b.height - 8)}px`;
 }
 
 // How big an hour is on the timeline shown, or a day box in the month view.
@@ -1610,6 +1661,7 @@ function liftSticker(x, y) {
   gestureUsed = true; // not a swipe
   const [unit, month] = stickerUnit();
   const [w, h] = stickerBox(s.sticker, s.size, unit, month);
+  s.rot = s.p?.rot || 0;
   s.ghost = Object.assign(document.createElement('img'), { className: 'stk-ghost', src: s.sticker.src, alt: '' });
   Object.assign(s.ghost.style, { width: `${w}px`, height: `${h}px` });
   document.body.append(s.ghost);
@@ -1619,7 +1671,7 @@ function liftSticker(x, y) {
 }
 
 function followSticker(x, y) {
-  if (stk?.ghost) stk.ghost.style.translate = `${x}px ${y}px`;
+  if (stk?.ghost) stk.ghost.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${stk.rot}deg) scale(1.08)`;
 }
 
 function dropSticker(s) {
@@ -1629,19 +1681,10 @@ function dropSticker(s) {
   if (stk === s) stk = null;
 }
 
-async function stickerMenu(p, x, y) {
-  const dot = (r) => `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="${r}" fill="currentColor"/></svg>`;
-  const choice = await createMenu({
-    x,
-    y,
-    heading: 'Sticker',
-    choices: [
-      ...SIZES.map(([k, name], i) => [k, dot(3 + i * 2.5), `${name}${(p.size || 'm') === k ? ' ✓' : ''}`]),
-      ['remove', icons.close, 'Remove'],
-    ],
-  });
-  if (choice === 'remove') commit([{ op: 'remove', coll: 'placements', id: p.id }], 'Sticker removed');
-  else if (choice && choice !== p.size) commit([{ op: 'put', coll: 'placements', obj: { ...p, size: choice, updatedAt: Date.now() } }]);
+function removePicked() {
+  const id = pickedSticker;
+  unpickSticker();
+  if (id) commit([{ op: 'remove', coll: 'placements', id }], 'Sticker removed');
 }
 
 function wireStickers() {
@@ -1662,6 +1705,15 @@ function wireStickers() {
       drawTray();
     } else if (del) deleteSticker(del.dataset.stkDel);
   });
+  // The picked sticker's bar.
+  app.addEventListener('click', (e) => {
+    if (!e.target.closest('#stk-bar')) return;
+    const p = state.placements.get(pickedSticker);
+    const size = e.target.closest('[data-stk-sz]')?.dataset.stkSz;
+    if (!p) return;
+    if (e.target.closest('[data-stk-rm]')) removePicked();
+    else if (size && size !== p.size) commit([{ op: 'put', coll: 'placements', obj: { ...p, size, updatedAt: Date.now() } }]);
+  });
   app.addEventListener('change', (e) => {
     if (!e.target.closest('#stk-tray') || e.target.type !== 'file') return;
     const file = e.target.files?.[0];
@@ -1673,47 +1725,88 @@ function wireStickers() {
   // the tray instead); a stuck one with a mouse right away, with a finger
   // after holding it.
   app.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || stk || sel || mv || e.target.closest('[data-stk-del]')) return;
+    // Pressing anywhere else lets go of the picked sticker.
+    if (pickedSticker && !e.target.closest('.stk.picked, #stk-bar')) unpickSticker();
+    if (e.button !== 0 || stk || turn || sel || mv || e.target.closest('[data-stk-del]')) return;
+    // Its handle turns it, about its middle.
+    const handle = e.target.closest('.stk-rot');
+    if (handle) {
+      const wrap = handle.closest('.stk');
+      const p = state.placements.get(wrap.dataset.p);
+      if (!p) return;
+      const r = wrap.getBoundingClientRect();
+      turn = { p, wrap, cx: r.left + r.width / 2, cy: r.top + r.height / 2, id: e.pointerId, rot: p.rot || 0, from: wrap.classList.contains('rot-below') ? 180 : 0 };
+      capture(handle, e.pointerId);
+      $('#stk-bar').hidden = true;
+      e.preventDefault();
+      return;
+    }
     const pick = e.target.closest('.stk-pick');
     const stuck = !pick && e.target.closest('.stk');
     const p = stuck && state.placements.get(stuck.dataset.p);
     const sticker = pick ? allStickers().get(pick.dataset.sticker) : p && allStickers().get(p.stickerId);
     if (!sticker) return;
     stk = { sticker, size: p ? p.size : settings.stickerSize || 'm', p, el: stuck || null, x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType === 'touch', on: false };
-    if (stk.touch && p) stk.timer = setTimeout(() => stk && !stk.on && liftSticker(stk.x, stk.y), LONG_PRESS_MS);
+    if (stk.touch && p && p.id !== pickedSticker) stk.timer = setTimeout(() => stk && !stk.on && liftSticker(stk.x, stk.y), LONG_PRESS_MS);
     if (!stk.touch) e.preventDefault();
   });
   app.addEventListener('pointermove', (e) => {
+    if (turn && e.pointerId === turn.id) {
+      gestureUsed = true; // not a swipe
+      const deg = (Math.atan2(e.clientY - turn.cy, e.clientX - turn.cx) * 180) / Math.PI + 90 - turn.from;
+      turn.rot = (((Math.round(deg / 15) * 15) % 360) + 360) % 360;
+      turn.wrap.style.setProperty('--rot', `${turn.rot}deg`);
+      return;
+    }
     const s = stk;
     if (!s || e.pointerId !== s.id) return;
     if (!s.on) {
       const far = Math.hypot(e.clientX - s.x, e.clientY - s.y);
-      // A finger moving off a stuck sticker before the hold is up is a swipe.
-      if (s.touch && s.p) return far > 8 && dropSticker(s);
+      // A finger moving off a stuck sticker before the hold is up is a swipe
+      // (unless it's picked).
+      if (s.touch && s.p && s.p.id !== pickedSticker) return far > 8 && dropSticker(s);
       if (far < 5) return;
       liftSticker(e.clientX, e.clientY);
     }
     followSticker(e.clientX, e.clientY);
   });
   app.addEventListener('pointerup', async (e) => {
+    if (turn && e.pointerId === turn.id) {
+      const t = turn;
+      turn = null;
+      if (t.rot !== (t.p.rot || 0)) commit([{ op: 'put', coll: 'placements', obj: { ...t.p, rot: t.rot, updatedAt: Date.now() } }]);
+      else placeBar();
+      return;
+    }
     const s = stk;
     if (!s || e.pointerId !== s.id) return;
     dropSticker(s);
     if (!s.on) {
-      if (s.p) stickerMenu(s.p, e.clientX, e.clientY); // a tap on a stuck sticker
+      if (s.p) pickSticker(s.p.id); // a tap on a stuck sticker
       return;
     }
     const anchor = await anchorAt(e.clientX, e.clientY, s.p);
     if (!anchor) return;
     const now = Date.now();
     const keep = s.p ? { id: s.p.id, createdAt: s.p.createdAt } : { id: uid(), createdAt: now };
-    commit([{ op: 'put', coll: 'placements', obj: { ...keep, stickerId: s.sticker.id, size: s.size, ...anchor, updatedAt: now } }]);
+    const rot = s.p?.rot ? { rot: s.p.rot } : {};
+    commit([{ op: 'put', coll: 'placements', obj: { ...keep, stickerId: s.sticker.id, size: s.size, ...rot, ...anchor, updatedAt: now } }]);
   });
   app.addEventListener('pointercancel', (e) => {
     if (stk && e.pointerId === stk.id) dropSticker(stk);
+    if (turn && e.pointerId === turn.id) {
+      turn.wrap.style.setProperty('--rot', `${turn.p.rot || 0}deg`);
+      turn = null;
+      placeBar();
+    }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && stk) dropSticker(stk);
+    else if (e.key === 'Escape') unpickSticker();
+    else if ((e.key === 'Delete' || e.key === 'Backspace') && pickedSticker && !e.target.closest?.('input, textarea, select, [contenteditable]')) {
+      e.preventDefault();
+      removePicked();
+    }
   });
 }
 

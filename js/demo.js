@@ -65,9 +65,9 @@ export function demoStore(weekStart) {
     // The glitter star on the lab meeting and on a free afternoon, and on a
     // day in the month view.
     placements: new Map([
-      { id: 'demo-s1', stickerId: 'builtin-glitter-star', size: 's', at: 'event', eventId: 'demo-lab', date: day(1), following: false, col: 0, fx: 0.92, fy: 0.15 },
-      { id: 'demo-s2', stickerId: 'builtin-glitter-star', size: 'm', at: 'time', date: day(5), min: 15 * 60, x: 0.5 },
-      { id: 'demo-s3', stickerId: 'builtin-glitter-star', size: 'm', at: 'month', date: day(6), fx: 0.7, fy: 0.62 },
+      { id: 'demo-s1', stickerId: 'builtin-glitter-star', size: 'm', at: 'event', eventId: 'demo-lab', date: day(1), following: false, col: 0, fx: 0.92, fy: 0.15 },
+      { id: 'demo-s2', stickerId: 'builtin-glitter-star', size: 'l', at: 'time', date: day(5), min: 15 * 60, x: 0.5, rot: 15 },
+      { id: 'demo-s3', stickerId: 'builtin-glitter-star', size: 'l', at: 'month', date: day(6), fx: 0.7, fy: 0.62, rot: 345 },
     ].map((p) => [p.id, { ...p, createdAt: now, updatedAt: now }])),
   };
   const snap = () => ({

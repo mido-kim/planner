@@ -528,10 +528,10 @@ test('stickers: the background around a picture clears, with a soft edge, and th
 });
 test('stickers: sizes follow the hours (timelines) or the day boxes (month), longer side', () => {
   const wide = { w: 200, h: 100 };
-  eq(stickerBox(wide, 's', 30), [30, 15]);
-  eq(stickerBox(wide, 'm', 30), [60, 30]);
-  eq(stickerBox({ w: 100, h: 200 }, 'l', 20), [35, 70]);
-  eq(stickerBox({ w: 100, h: 100 }, 'm', 100, true).map(Math.round), [55, 55]);
+  eq(stickerBox(wide, 's', 30).map(Math.round), [18, 9]);
+  eq(stickerBox(wide, 'm', 30), [30, 15]);
+  eq(stickerBox({ w: 100, h: 200 }, 'l', 20), [20, 40]);
+  eq(stickerBox({ w: 100, h: 100 }, 'm', 100, true).map(Math.round), [35, 35]);
 });
 test("stickers: on an event, a repeating one's day or that day and later ones, and changed days", () => {
   const one = { id: 'e1' };
