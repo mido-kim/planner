@@ -9,3 +9,6 @@ desktop.ini
 # Downloaded font packages: only the converted .woff files and the license are used
 fonts/*.zip
 fonts/Instrument_Serif/
+
+# Sticker sheets the built-in stickers were cut from (not part of the app)
+stickers/sheets/

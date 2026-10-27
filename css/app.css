@@ -1180,20 +1180,56 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   z-index: 60;
   top: 64px;
   right: 14px;
-  width: 300px;
-  padding: 8px 10px 10px;
+  width: 346px;
+  padding: 2px 10px 8px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--bg);
   box-shadow: var(--shadow);
+  transition: opacity 0.15s;
 }
+/* While a sticker from it is dragged, the tray steps back (main.js). */
+.stk-tray.dragging { opacity: 0.3; pointer-events: none; }
+/* The grip: swipe the tray up for rows of stickers, down for one row. */
+.stk-grip { height: 14px; margin: 0 -10px; cursor: grab; touch-action: none; }
+.stk-grip::before { content: ""; display: block; width: 38px; height: 4px; margin: 6px auto 0; border-radius: 2px; background: var(--line); }
+.stk-head, .stk-tabs { touch-action: none; }
 .stk-head { display: flex; align-items: center; gap: 6px; }
 .stk-head h2 { flex: 1; font-size: 18px; font-weight: 400; }
 .stk-sizes { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--bg-3); }
 .stk-sizes button { min-width: 28px; height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--fg-2); font-size: 13px; }
 .stk-sizes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
 .stk-head .icon-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
-.stk-list { display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 6px; scrollbar-width: thin; }
+.stk-list { display: flex; gap: 8px; overflow-x: auto; padding: 8px 2px 6px; scrollbar-width: thin; }
+/* Swiped up: rows of five, scrolling up and down (a finger holds a sticker a
+   moment to pick it up). */
+.stk-tray.more .stk-list {
+  display: grid;
+  grid-template-columns: repeat(5, 58px);
+  justify-content: space-between;
+  gap: 8px 0;
+  max-height: min(380px, 52dvh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.stk-tray.more .stk-pick { touch-action: pan-y; }
+/* Categories along the bottom, as on the emoji keyboard. */
+.stk-tabs { display: flex; gap: 4px; padding: 6px 0 2px; border-top: 1px solid var(--line-soft); }
+.stk-tabs button {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 36px;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  opacity: 0.55;
+}
+.stk-tabs button:hover { background: var(--bg-hover); opacity: 0.85; }
+.stk-tabs button[aria-selected="true"] { background: var(--accent-soft); opacity: 1; }
+.stk-tabs img { max-width: 30px; max-height: 26px; pointer-events: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .stk-pick {
   position: relative;
   flex: none;
@@ -1239,7 +1275,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .stk-add:hover { background: var(--bg-hover); }
 .stk-add svg { width: 18px; height: 18px; }
-.stk-tip { font-size: 12.5px; color: var(--fg-3); }
+.stk-tip { padding-top: 2px; font-size: 12.5px; color: var(--fg-3); }
 @media (max-width: 760px) {
   .stk-tray { top: auto; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; }
 }

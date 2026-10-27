@@ -3,6 +3,23 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.11.0 (2026-10-27)
+
+- 127 letter stickers come with the app, cut from three sticker sheets, each
+  A to Z:
+  - Hearts: 25 pink candy hearts (the sheet has no X).
+  - Patches: 76 patch letters, several of most letters (floral, gingham,
+    leopard, chrome, crowned …).
+  - Beads: 26 white letter beads.
+- The sticker tray has categories along its bottom, like the emoji keyboard:
+  Mine (the glitter star and the stickers you make), Hearts, Patches, Beads.
+- The tray shows one row of stickers (five at a time, sideways for more).
+  Swipe it up (or tap its arrow) for rows of them, and down for one row
+  again. In the rows, hold a sticker a moment before dragging it out (a quick
+  swipe scrolls).
+- While a sticker is dragged out of the tray, the tray fades, so you can drop
+  it on the days behind it.
+
 ## 0.10.1 (2026-10-27)
 
 - Sticker sizes are smaller: Large is what Medium was, Medium what Small was,

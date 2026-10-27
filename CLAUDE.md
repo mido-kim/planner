@@ -61,7 +61,13 @@ and setup, CHANGELOG.md for history.
 - `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
   label picker, symbol picker), scope dialog, task editor, labels manager,
   create menu, settings (with the working hours list).
-- Stickers (`js/stickers.js`: `BUILT_IN` (files in `stickers/`),
+- Stickers (`js/stickers.js`: `BUILT_IN` = the glitter star plus
+  `js/sticker-sets.js` (made by a script: hearts, patches, beads, A to Z, in
+  `stickers/<set>/`; cut from the sheets in `stickers/sheets/`, which git
+  ignores); `CATEGORIES` are the tray's tabs (`settings.stickerSet`). The
+  sticker pictures aren't in sw.js SHELL: they're cached as first shown.
+  `trayMore` = the tray swiped up (rows; a finger holds a sticker 280ms to
+  lift it), swiped by `traySwipe` on its grip, head or tabs.
   `makeSticker` (canvas: `clearBackground` flood-fills the edge color away,
   `visibleBox` trims, ≤320px, WebP or PNG data URL), `stickerBox` (S/M/L:
   hours tall on timelines, share of a day box in the month), `onOccurrence`).

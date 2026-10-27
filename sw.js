@@ -25,6 +25,7 @@ const SHELL = [
   'js/series.js',
   'js/settings.js',
   'js/stickers.js',
+  'js/sticker-sets.js',
   'js/store.js',
   'js/symbols.js',
   'js/util.js',

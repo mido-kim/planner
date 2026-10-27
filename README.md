@@ -170,7 +170,7 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 | `js/views/agenda.js` | Agenda (events, deadlines and tasks with details) |
 | `js/holidays.js` | Korean public holidays, 2026–2031 |
 | `js/dialogs.js` | Event, task, repeat-scope, labels, settings and new-sticker dialogs |
-| `js/stickers.js`, `stickers/` | Stickers: making them from pictures, sizes, which event they stick to; the built-in ones |
+| `js/stickers.js`, `js/sticker-sets.js`, `stickers/` | Stickers: making them from pictures, sizes, which event they stick to; the sets that come with the app (hearts, patches, beads) |
 | `js/recurrence.js` | Repeat rules: occurrence dates, descriptions, iCalendar RRULE |
 | `js/series.js` | "This / this and following / all" edits and deletes |
 | `js/store.js` | Local storage, and the interface any storage must provide |

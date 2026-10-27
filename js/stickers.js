@@ -1,3 +1,5 @@
+import { STICKER_SETS } from './sticker-sets.js';
+
 // Stickers: little pictures stuck anywhere on the calendar.
 //
 // A sticker is a picture: { id, name, src, w, h } in the `stickers`
@@ -21,7 +23,17 @@
 // view.
 
 export const BUILT_IN = [
-  { id: 'builtin-glitter-star', name: 'Glitter star', src: 'stickers/glitter-star.webp', w: 320, h: 307 },
+  { id: 'builtin-glitter-star', name: 'Glitter star', src: 'stickers/glitter-star.webp', w: 320, h: 307, set: 'mine' },
+  ...STICKER_SETS,
+];
+
+// The tray's categories, like the emoji keyboard's: id, name, and the sticker
+// on its tab. 'mine' also holds the stickers you make.
+export const CATEGORIES = [
+  ['mine', 'Mine', 'builtin-glitter-star'],
+  ['hearts', 'Hearts', 'hearts-a'],
+  ['patches', 'Patches', 'patches-a-pink'],
+  ['beads', 'Beads', 'beads-a'],
 ];
 
 export const SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];

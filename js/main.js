@@ -11,7 +11,7 @@ import { expand, spanDays } from './recurrence.js';
 import { deadlineToTaskOps, deleteOps, isRepeating, masterOf, moveOps, saveOps, taskToDeadlineOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
-import { BUILT_IN as STOCK_STICKERS, makeSticker, onOccurrence, SIZES, stickerBox } from './stickers.js';
+import { BUILT_IN as STOCK_STICKERS, CATEGORIES, makeSticker, onOccurrence, SIZES, stickerBox } from './stickers.js';
 import { doneOps } from './symbols.js';
 import { applyTheme, cssVars, PRESETS, presetOf } from './themes.js';
 import { $, esc, readJSON, uid, writeJSON } from './util.js';
@@ -1466,6 +1466,8 @@ function wireGestures() {
 const allStickers = () => new Map([...STOCK_STICKERS, ...state.stickers.values()].map((x) => [x.id, x]));
 let trayOpen = false;
 let trayEdit = false; // stickers you made show a × to delete them
+let trayMore = false; // the tray swiped up: rows of stickers instead of one
+let traySwipe = null; // a finger or the mouse swiping the tray up or down
 let stk = null; // a sticker being dragged (from the tray, or one stuck on)
 let pickedSticker = null; // the placement tapped last, while it shows its handle and bar
 let turn = null; // a picked sticker being turned by its handle
@@ -1476,6 +1478,9 @@ function toggleTray(open = !trayOpen) {
   drawTray();
 }
 
+// The tray: one category at a time (tabs along the bottom, as on the emoji
+// keyboard). It shows one row of stickers (five at a time, sideways for more);
+// swiped up (or its arrow) it shows rows of them, and swiped down one again.
 function drawTray() {
   const tray = $('#stk-tray');
   if (!tray) return;
@@ -1483,22 +1488,36 @@ function drawTray() {
   $('.stickers-btn')?.setAttribute('aria-pressed', trayOpen);
   if (!trayOpen) return;
   const size = settings.stickerSize || 'm';
+  const cat = CATEGORIES.some(([id]) => id === settings.stickerSet) ? settings.stickerSet : 'mine';
   const own = [...state.stickers.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  if (!own.length) trayEdit = false;
+  if (!own.length || cat !== 'mine') trayEdit = false;
+  const pics = allStickers();
+  const shown = [...STOCK_STICKERS.filter((x) => x.set === cat), ...(cat === 'mine' ? own : [])];
   const pick = (x, mine) => `<div class="stk-pick" data-sticker="${esc(x.id)}" role="img" aria-label="${esc(x.name || 'Sticker')}" title="${esc(x.name || 'Sticker')}">
-    <img src="${esc(x.src)}" alt="" draggable="false">${mine && trayEdit ? `<button type="button" class="stk-del" data-stk-del="${esc(x.id)}" aria-label="Delete this sticker">${icons.close}</button>` : ''}</div>`;
+    <img src="${esc(x.src)}" alt="" draggable="false" loading="lazy">${mine && trayEdit ? `<button type="button" class="stk-del" data-stk-del="${esc(x.id)}" aria-label="Delete this sticker">${icons.close}</button>` : ''}</div>`;
+  const list = tray.querySelector('.stk-list');
+  const keep = list && tray.dataset.cat === cat && tray.classList.contains('more') === trayMore ? [list.scrollLeft, list.scrollTop] : [0, 0];
+  tray.dataset.cat = cat;
+  tray.classList.toggle('more', trayMore);
   tray.innerHTML = `
+    <div class="stk-grip" role="button" aria-label="${trayMore ? 'Show one row of stickers' : 'Show more stickers'}" title="Swipe up for more, down for one row"></div>
     <div class="stk-head">
-      <h2>Stickers</h2>
+      <h2>${esc(CATEGORIES.find(([id]) => id === cat)[1])}</h2>
       <div class="stk-sizes" role="group" aria-label="Size to stick at">${SIZES.map(([k, name]) => `<button type="button" data-stk-size="${k}" aria-pressed="${k === size}" title="${name}">${name[0]}</button>`).join('')}</div>
-      ${own.length ? `<button type="button" class="icon-btn sm" data-stk-act="edit" aria-pressed="${trayEdit}" aria-label="Delete stickers" title="Delete stickers">${icons.pencil}</button>` : ''}
+      ${cat === 'mine' && own.length ? `<button type="button" class="icon-btn sm" data-stk-act="edit" aria-pressed="${trayEdit}" aria-label="Delete stickers" title="Delete stickers">${icons.pencil}</button>` : ''}
+      <button type="button" class="icon-btn sm stk-more-btn" data-stk-act="more" aria-label="${trayMore ? 'Fewer stickers' : 'More stickers'}" title="${trayMore ? 'One row' : 'More at once'}">${trayMore ? icons.down : icons.up}</button>
       <button type="button" class="icon-btn sm" data-stk-act="close" aria-label="Close stickers" title="Close">${icons.close}</button>
     </div>
     <div class="stk-list">
-      ${[...STOCK_STICKERS.map((x) => pick(x, false)), ...own.map((x) => pick(x, true))].join('')}
-      <label class="stk-add" title="Make a sticker from a picture"><input type="file" accept="image/*" hidden>${icons.plus}<span>Add</span></label>
+      ${shown.map((x) => pick(x, cat === 'mine' && !x.set)).join('')}
+      ${cat === 'mine' ? `<label class="stk-add" title="Make a sticker from a picture"><input type="file" accept="image/*" hidden>${icons.plus}<span>Add</span></label>` : ''}
+    </div>
+    <div class="stk-tabs" role="tablist" aria-label="Sticker sets">
+      ${CATEGORIES.map(([id, name, face]) => `<button type="button" role="tab" data-stk-cat="${id}" aria-selected="${id === cat}" aria-label="${name}" title="${name}"><img src="${esc(pics.get(face)?.src || '')}" alt="" draggable="false"></button>`).join('')}
     </div>
     <p class="stk-tip">${trayEdit ? 'Tap × to delete a sticker you made.' : 'Drag a sticker onto the calendar. Tap a stuck one to turn, resize or remove it.'}</p>`;
+  const fresh = tray.querySelector('.stk-list');
+  [fresh.scrollLeft, fresh.scrollTop] = keep;
 }
 
 async function addSticker(file) {
@@ -1624,7 +1643,7 @@ function stickerUnit() {
 // calendar, or the question about a repeating event was cancelled). `prev`:
 // where it was stuck before, when moving one.
 async function anchorAt(x, y, prev) {
-  const under = document.elementsFromPoint(x, y).find((el) => !el.closest('.stk, .stk-ghost'));
+  const under = document.elementsFromPoint(x, y).find((el) => !el.closest('.stk, .stk-ghost, #stk-tray, #stk-bar'));
   const cal = $('#cal');
   if (!under?.closest('#cal')) return null;
   if (cal.querySelector('.mv')) {
@@ -1666,6 +1685,8 @@ function liftSticker(x, y) {
   Object.assign(s.ghost.style, { width: `${w}px`, height: `${h}px` });
   document.body.append(s.ghost);
   s.el?.classList.add('lifted');
+  // The tray steps back so the days under it can be dropped on.
+  if (!s.p) $('#stk-tray')?.classList.add('dragging');
   if (s.touch) navigator.vibrate?.(10);
   followSticker(x, y);
 }
@@ -1676,6 +1697,7 @@ function followSticker(x, y) {
 
 function dropSticker(s) {
   clearTimeout(s?.timer);
+  $('#stk-tray')?.classList.remove('dragging');
   s?.ghost?.remove();
   s?.el?.classList.remove('lifted');
   if (stk === s) stk = null;
@@ -1700,7 +1722,17 @@ function wireStickers() {
       persist();
       drawTray();
     } else if (act === 'close') toggleTray(false);
-    else if (act === 'edit') {
+    else if (act === 'more') {
+      trayMore = !trayMore;
+      drawTray();
+    } else if (e.target.closest('[data-stk-cat]')) {
+      settings.stickerSet = e.target.closest('[data-stk-cat]').dataset.stkCat;
+      persist();
+      drawTray();
+    } else if (e.target.closest('.stk-grip')) {
+      trayMore = !trayMore;
+      drawTray();
+    } else if (act === 'edit') {
       trayEdit = !trayEdit;
       drawTray();
     } else if (del) deleteSticker(del.dataset.stkDel);
@@ -1742,12 +1774,16 @@ function wireStickers() {
       return;
     }
     const pick = e.target.closest('.stk-pick');
+    if (!pick && e.target.closest('#stk-tray') && !(trayMore && e.target.closest('.stk-list'))) {
+      traySwipe = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      return;
+    }
     const stuck = !pick && e.target.closest('.stk');
     const p = stuck && state.placements.get(stuck.dataset.p);
     const sticker = pick ? allStickers().get(pick.dataset.sticker) : p && allStickers().get(p.stickerId);
     if (!sticker) return;
     stk = { sticker, size: p ? p.size : settings.stickerSize || 'm', p, el: stuck || null, x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType === 'touch', on: false };
-    if (stk.touch && p && p.id !== pickedSticker) stk.timer = setTimeout(() => stk && !stk.on && liftSticker(stk.x, stk.y), LONG_PRESS_MS);
+    if (stk.touch && ((p && p.id !== pickedSticker) || (pick && trayMore))) stk.timer = setTimeout(() => stk && !stk.on && liftSticker(stk.x, stk.y), pick ? 280 : LONG_PRESS_MS);
     if (!stk.touch) e.preventDefault();
   });
   app.addEventListener('pointermove', (e) => {
@@ -1763,14 +1799,25 @@ function wireStickers() {
     if (!s.on) {
       const far = Math.hypot(e.clientX - s.x, e.clientY - s.y);
       // A finger moving off a stuck sticker before the hold is up is a swipe
-      // (unless it's picked).
-      if (s.touch && s.p && s.p.id !== pickedSticker) return far > 8 && dropSticker(s);
+      // (unless it's picked); in the tray's rows, a scroll.
+      if (s.touch && ((s.p && s.p.id !== pickedSticker) || (!s.p && trayMore))) return far > 8 && dropSticker(s);
       if (far < 5) return;
       liftSticker(e.clientX, e.clientY);
     }
     followSticker(e.clientX, e.clientY);
   });
   app.addEventListener('pointerup', async (e) => {
+    if (traySwipe && e.pointerId === traySwipe.id) {
+      const dx = e.clientX - traySwipe.x;
+      const dy = e.clientY - traySwipe.y;
+      traySwipe = null;
+      if (Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx) && trayMore !== dy < 0) {
+        trayMore = dy < 0;
+        suppressClickUntil = Date.now() + 300; // not a tap on whatever it started on
+        drawTray();
+      }
+      return;
+    }
     if (turn && e.pointerId === turn.id) {
       const t = turn;
       turn = null;
@@ -1793,6 +1840,7 @@ function wireStickers() {
     commit([{ op: 'put', coll: 'placements', obj: { ...keep, stickerId: s.sticker.id, size: s.size, ...rot, ...anchor, updatedAt: now } }]);
   });
   app.addEventListener('pointercancel', (e) => {
+    if (traySwipe && e.pointerId === traySwipe.id) traySwipe = null;
     if (stk && e.pointerId === stk.id) dropSticker(stk);
     if (turn && e.pointerId === turn.id) {
       turn.wrap.style.setProperty('--rot', `${turn.p.rot || 0}deg`);

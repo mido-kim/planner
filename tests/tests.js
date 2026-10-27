@@ -10,7 +10,7 @@ import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from
 import { cssVars, fromHsl, KEYS, mix, PRESETS, presetOf, toHsl } from '../js/themes.js';
 import { DEFAULTS, workSpans } from '../js/settings.js';
 import { doneOps, isDone, symbolOf } from '../js/symbols.js';
-import { clearBackground, onOccurrence, stickerBox, visibleBox } from '../js/stickers.js';
+import { BUILT_IN, CATEGORIES, clearBackground, onOccurrence, stickerBox, visibleBox } from '../js/stickers.js';
 
 const results = [];
 function test(name, fn) {
@@ -546,6 +546,19 @@ test("stickers: on an event, a repeating one's day or that day and later ones, a
   // That day changed by itself (another time): the sticker goes with it.
   eq([onOccurrence(day, moved, '2026-10-22'), onOccurrence(later, moved, '2026-10-22')], [true, true]);
   eq(onOccurrence({ ...day, date: '2026-10-28' }, moved, '2026-10-22'), false);
+});
+test('stickers: the sets that come with the app, A to Z, each with its own id', () => {
+  const ids = BUILT_IN.map((x) => x.id);
+  eq(new Set(ids).size, ids.length);
+  for (const set of ['hearts', 'patches', 'beads']) {
+    const names = BUILT_IN.filter((x) => x.set === set).map((x) => x.id);
+    eq(names, [...names].sort());
+    if (!BUILT_IN.filter((x) => x.set === set).every((x) => x.src === `stickers/${set}/${x.id.slice(set.length + 1)}.webp` && x.w > 0 && x.h > 0)) {
+      throw new Error(`${set}: a sticker without its picture or size`);
+    }
+  }
+  eq(BUILT_IN.filter((x) => x.set === 'beads').length, 26);
+  eq(CATEGORIES.every(([, , face]) => ids.includes(face)), true);
 });
 test('backup: stickers and where they are go out and come back', () => {
   const sticker = { id: 'k1', name: 'Star', src: 'data:image/png;base64,AAAA', w: 10, h: 10 };
