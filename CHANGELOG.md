@@ -3,6 +3,32 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.10.0 (2026-10-27)
+
+- An event's notes show inside its box on the day, week and 2-week views, in
+  the room left below the time: whole lines, the last one faded when there's
+  more. Month view items have no room for them.
+- Stickers. The sticker button (beside the agenda button on a PC, beside the
+  arrows on a phone) opens the sticker tray.
+  - **Add** makes a sticker from a picture: the background around it (the
+    color along its edges) turns see-through and it's cut to fit. You see it
+    small, medium and large before adding it, and can keep the background
+    instead. Stickers sync to your other devices.
+  - Drag a sticker from the tray onto the calendar. Pick S, M or L in the
+    tray first.
+  - On the day, week and 2-week views, a sticker dropped on an event goes
+    with that event (it moves when the event moves). On a repeating event
+    you're asked: just that one, or that one and all following. Dropped
+    anywhere else, it stays at that day and time.
+  - Timeline stickers grow and shrink with the hours, so they keep the same
+    place beside your events in all three views.
+  - Month view stickers stay on their day there, and only show in the month
+    view.
+  - Drag a stuck sticker to move it (on a phone, hold it first). Tap it to
+    make it small, medium or large, or to remove it.
+  - The glitter star comes with the app.
+- Backups include stickers and where they're stuck.
+
 ## 0.9.0 (2026-10-21)
 
 - Light is now called **Gelato Days**, after the palette its colors came

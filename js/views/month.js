@@ -81,7 +81,7 @@ export function renderMonth({ range, occs, tasks = [], labels = new Map(), setti
     weeks.push(`<div class="mv-week">${cells.join('')}${barsHtml.join('')}</div>`);
   }
 
-  return `<div class="mv" style="--weeks:${range.weeks}"><div class="mv-head">${head}</div>${weeks.join('')}</div>`;
+  return `<div class="mv" style="--weeks:${range.weeks}"><div class="mv-head">${head}</div>${weeks.join('')}<div class="stk-layer" aria-hidden="true"></div></div>`;
 }
 
 // By time; at the same time events, then deadlines, then tasks.

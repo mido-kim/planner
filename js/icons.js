@@ -10,6 +10,8 @@ export const icons = {
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   close: svg('<path d="M18 6L6 18M6 6l12 12"/>'),
   tasks: svg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9.5l1.5 1.5L11 8.5M14 10h3M7 15h10"/>'),
+  // A sticker with its corner peeling up.
+  sticker: svg('<path d="M14 20H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v7z"/><path d="M14 20v-3a3 3 0 0 1 3-3h3"/><path d="M9 10h.01M15 10h.01M9.5 14c1.5 1 3.5 1 5 0" stroke-width="1.6"/>'),
   settings: svg('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>'),
   repeat: svg('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>', 12),
   up: svg('<path d="M12 19V5M5 12l7-7 7 7"/>', 11),

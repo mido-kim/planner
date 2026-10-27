@@ -39,6 +39,12 @@ an app on a PC (Chrome) and an iPhone (Safari).
   symbol in front of the name: a check box, or a heart, star, book, beaker…
   or none, set per label or per event).
 - **Tasks ⇄ deadlines:** turn a task into a deadline or back from its editor.
+- **Notes on the calendar:** an event's notes show inside its box on the day,
+  week and 2-week views, in whatever room is left.
+- **Stickers:** make stickers from your own pictures (the background clears
+  itself) and drag them onto the calendar. On the timelines they stick to an
+  event or a time and grow with the hours; in the month view they stick to a
+  day.
 - **Swipe** sideways through days and weeks, and up or down through the 2-week
   and month views a week at a time. On a PC the mouse wheel does the same over
   the calendar: tilt it (or hold Shift) for days and weeks, roll it for the
@@ -163,7 +169,8 @@ If there's been no backup from a device for 30 days, the app shows a reminder.
 | `js/views/month.js` | Month grid |
 | `js/views/agenda.js` | Agenda (events, deadlines and tasks with details) |
 | `js/holidays.js` | Korean public holidays, 2026–2031 |
-| `js/dialogs.js` | Event, task, repeat-scope, labels and settings dialogs |
+| `js/dialogs.js` | Event, task, repeat-scope, labels, settings and new-sticker dialogs |
+| `js/stickers.js`, `stickers/` | Stickers: making them from pictures, sizes, which event they stick to; the built-in ones |
 | `js/recurrence.js` | Repeat rules: occurrence dates, descriptions, iCalendar RRULE |
 | `js/series.js` | "This / this and following / all" edits and deletes |
 | `js/store.js` | Local storage, and the interface any storage must provide |

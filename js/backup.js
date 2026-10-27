@@ -5,12 +5,13 @@ import { isIOS } from './util.js';
 // Backups (.json, everything, restorable here) and .ics export (events and
 // deadlines, opens in Google Calendar, Apple Calendar, Outlook and others).
 
-export function backupFile(events, tasks, labels = new Map(), themes = new Map()) {
+export function backupFile(events, tasks, labels = new Map(), themes = new Map(), stickers = new Map(), placements = new Map()) {
   const now = new Date();
   const text = JSON.stringify(
     {
       app: 'planner', version: 1, exportedAt: now.toISOString(),
       events: [...events.values()], tasks: [...tasks.values()], labels: [...labels.values()], themes: [...themes.values()],
+      stickers: [...stickers.values()], placements: [...placements.values()],
     },
     null,
     1,
@@ -32,10 +33,15 @@ export function parseBackup(text) {
   const okTask = (t) => t && typeof t.id === 'string' && typeof t.title === 'string';
   const okLabel = (l) => l && typeof l.id === 'string' && typeof l.name === 'string';
   const okTheme = (t) => okLabel(t) && t.vars && typeof t.vars === 'object';
-  // Backups from before 0.3.0 have no labels, and from before 0.6.0 no themes.
-  const labels = Array.isArray(d.labels) ? d.labels.filter(okLabel) : [];
-  const themes = Array.isArray(d.themes) ? d.themes.filter(okTheme) : [];
-  return { exportedAt: d.exportedAt, events: d.events.filter(okEvent), tasks: d.tasks.filter(okTask), labels, themes };
+  const okSticker = (s) => s && typeof s.id === 'string' && typeof s.src === 'string';
+  const okPlacement = (p) => p && typeof p.id === 'string' && typeof p.stickerId === 'string' && typeof p.at === 'string';
+  // Backups from before 0.3.0 have no labels, from before 0.6.0 no themes,
+  // and from before 0.10.0 no stickers.
+  const list = (k, ok) => (Array.isArray(d[k]) ? d[k].filter(ok) : []);
+  return {
+    exportedAt: d.exportedAt, events: d.events.filter(okEvent), tasks: d.tasks.filter(okTask),
+    labels: list('labels', okLabel), themes: list('themes', okTheme), stickers: list('stickers', okSticker), placements: list('placements', okPlacement),
+  };
 }
 
 const text = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');

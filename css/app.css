@@ -260,8 +260,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 .topbar {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto auto;
-  grid-template-areas: "today arrows title seg tasks settings new";
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto auto auto;
+  grid-template-areas: "today arrows title seg stickers tasks settings new";
   align-items: center;
   gap: 6px;
   padding: 10px 14px;
@@ -271,6 +271,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .arrows { grid-area: arrows; display: flex; }
 .title-wrap { grid-area: title; position: relative; min-width: 0; padding-left: 6px; }
 .seg { grid-area: seg; }
+.stickers-btn { grid-area: stickers; }
+.stickers-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
 .tasks-btn { grid-area: tasks; }
 .settings-btn { grid-area: settings; }
 .new-group { grid-area: new; margin-left: 4px; display: inline-flex; border-radius: 9px; background: var(--accent); overflow: hidden; }
@@ -358,10 +360,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 @media (max-width: 760px) {
   .topbar {
-    grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
+    grid-template-columns: auto auto auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
-      "title title title tasks settings new"
-      "today arrows seg seg seg seg";
+      "title title title title tasks settings new"
+      "today arrows stickers seg seg seg seg";
     row-gap: 8px;
     padding: 8px 10px;
   }
@@ -618,6 +620,23 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
    way first, and is hidden when there's no space left for it. */
 .ev.short .ev-t { white-space: nowrap; flex: 0 0 auto; max-width: 100%; min-width: 0; }
 .ev.short .ev-m { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: clip; }
+/* An event's notes, in the room left below its time (whole lines, the last
+   one faded when cut off: main.js fitText). */
+.ev .ev-n {
+  flex: 1 1 0;
+  min-height: 0;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.3;
+  opacity: 0.8;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+.ev .ev-n.none { visibility: hidden; }
+.ev.short .ev-n { display: none; }
 .ev.ct { border-top-left-radius: 0; border-top-right-radius: 0; }
 .ev.cb { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 
@@ -688,6 +707,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   .tg-axis span { right: 5px; font-size: 10.5px; }
   .tg.n7 .ev { padding: 4px 3px 2px; font-size: 12px; border-radius: 4px; }
   .tg.n7 .ev .ev-m { display: none; }
+  .tg.n7 .ev .ev-n { font-size: 10.5px; line-height: 1.25; }
   .tg.n7 .ev.short { padding-top: 0; padding-bottom: 0; }
   .tg.n7 .chip, .tg.n7 .bar { font-size: 11.5px; }
   .tg.n7 .chip { padding: 0 3px; }
@@ -754,6 +774,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .tw-col.today { background-color: color-mix(in srgb, var(--accent) var(--today-tint), var(--bg)); }
 .ev.mini { flex-flow: row wrap; align-content: flex-start; gap: 0 3px; min-height: 3px; padding: 3px 3px 1px; border-radius: 3px; font-size: 11px; line-height: 1.15; }
 .ev.mini .ev-m { flex: none; font-size: 0.9em; opacity: 0.8; white-space: nowrap; }
+.ev.mini .ev-n { flex: 1 1 100%; margin-top: 1px; font-size: 0.88em; line-height: 1.2; }
 /* A block too short for a line under its top room (main.js squeezeMinis)
    shows its one line in the middle instead, as the week view does. */
 .ev.mini.short { flex-wrap: nowrap; align-items: center; padding-top: 0; padding-bottom: 0; }
@@ -1076,6 +1097,122 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .ad-day.sel, .mv-cell.sel { background-color: color-mix(in srgb, var(--accent) 55%, var(--bg)); }
 .tg-col.sel, .tw-col.sel { background-color: color-mix(in srgb, var(--accent) 30%, var(--bg)); }
 .ad-day.drop, .mv-cell.drop, .tg-col.drop, .tw-col.drop { background-color: color-mix(in srgb, var(--accent) 45%, var(--bg)); }
+
+/* ------------------------------------------------------------------ Stickers */
+
+/* Each view's sticker layer lies over its days (the timelines' day columns,
+   or the month's weeks); main.js drawStickers places the stickers in it.
+   Taps go through it except on the stickers themselves. */
+.tg-grid, .tw-week, .mv { position: relative; }
+.stk-layer { position: absolute; inset: 0; grid-row: 3; grid-column: 2 / -1; z-index: 15; overflow: hidden; pointer-events: none; }
+.mv > .stk-layer { grid-row: 2 / -1; grid-column: 1 / -1; }
+.stk, .stk-ghost, .stk-pick img {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+.stk {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: grab;
+  filter: drop-shadow(0 1px 1.5px rgba(40, 20, 30, 0.2));
+}
+.stk.lifted { opacity: 0.25; }
+.stk-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.08);
+  filter: drop-shadow(0 8px 12px rgba(40, 20, 30, 0.28));
+}
+
+/* The tray: below the toolbar at the right on a PC, along the bottom on a
+   phone. It doesn't dim anything, so stickers can be dragged out of it. */
+.stk-tray {
+  position: fixed;
+  z-index: 60;
+  top: 64px;
+  right: 14px;
+  width: 300px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+}
+.stk-head { display: flex; align-items: center; gap: 6px; }
+.stk-head h2 { flex: 1; font-size: 18px; font-weight: 400; }
+.stk-sizes { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--bg-3); }
+.stk-sizes button { min-width: 28px; height: 26px; padding: 0 6px; border: 0; border-radius: 6px; background: none; color: var(--fg-2); font-size: 13px; }
+.stk-sizes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.stk-head .icon-btn[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.stk-list { display: flex; gap: 8px; overflow-x: auto; padding: 10px 2px 6px; scrollbar-width: thin; }
+.stk-pick {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  padding: 6px;
+  border-radius: 10px;
+  background: var(--bg-2);
+  cursor: grab;
+  touch-action: pan-x;
+}
+.stk-pick:hover { background: var(--bg-hover); }
+.stk-pick img { max-width: 100%; max-height: 100%; pointer-events: none; }
+.stk-del {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--bg);
+  border-radius: 50%;
+  background: var(--danger);
+  color: #fff;
+}
+.stk-del svg { width: 12px; height: 12px; }
+.stk-add {
+  flex: none;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 58px;
+  height: 58px;
+  border: 1.5px dashed var(--line);
+  border-radius: 10px;
+  color: var(--fg-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.stk-add:hover { background: var(--bg-hover); }
+.stk-add svg { width: 18px; height: 18px; }
+.stk-tip { font-size: 12.5px; color: var(--fg-3); }
+@media (max-width: 760px) {
+  .stk-tray { top: auto; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; }
+}
+
+/* Making a sticker: the result on a checkerboard, small, medium and large. */
+.stk-preview {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 20px;
+  min-height: 120px;
+  padding: 16px;
+  border-radius: 10px;
+  background: repeating-conic-gradient(var(--bg-3) 0 25%, var(--bg) 0 50%) 0 0 / 16px 16px;
+}
+.stk-preview img { width: auto; max-width: 40%; filter: drop-shadow(0 1px 1.5px rgba(40, 20, 30, 0.2)); }
 
 /* ------------------------------------------------------------------ Agenda panel */
 

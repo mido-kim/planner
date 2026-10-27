@@ -22,13 +22,13 @@ export function demoStore(weekStart) {
   const at = (i, h, m = 0) => dt(day(i), h * 60 + m);
   const events = [
     ev('demo-lab', 'Lab meeting', null, at(1, 10), at(1, 11, 30), { labelId: 'demo-l-research', rrule: { freq: 'weekly', interval: 1, byWeekday: [1, 3], until: null, count: null }, doneDates: [day(1)] }),
-    ev('demo-us', 'Ultrasound experiment', 'green', at(2, 13), at(2, 17), { labelId: 'demo-l-research', notes: 'Bring the new transducer.' }),
+    ev('demo-us', 'Ultrasound experiment', 'green', at(2, 13), at(2, 17), { labelId: 'demo-l-research', notes: 'Bring the new transducer.\nCalibrate first.' }),
     ev('demo-ta', 'TA office hours', null, at(2, 14), at(2, 15), { labelId: 'demo-l-teaching', symbol: 'chat', doneDates: [day(2)] }),
     ev('demo-coffee', 'Coffee chat', 'pink', at(2, 14, 30), at(2, 15), { symbol: 'coffee' }),
     ev('demo-call', 'Quick call', 'gray', at(4, 9), at(4, 9, 15)),
     ev('demo-gym', 'Gym', null, at(4, 6), at(4, 7), { labelId: 'demo-l-personal', symbol: 'dumbbell' }),
     ev('demo-seminar', 'Seminar (maybe)', 'blue', at(4, 15), at(4, 16), { tentative: true }),
-    ev('demo-writing', 'Paper writing', 'blue', at(3, 19), at(3, 23)),
+    ev('demo-writing', 'Paper writing', 'blue', at(3, 19), at(3, 23), { notes: 'Methods section, then figures 2–4. 그림 캡션도 다시 보기.' }),
     ev('demo-conf', 'Conference', 'red', day(5), day(6), { allDay: true, shape: 'arrow' }),
     ev('demo-flight', 'Late flight', 'yellow', at(6, 22), at(7, 1, 30)),
     ev('demo-dentist', 'Dentist', 'gray', at(8, 16), at(8, 17)),
@@ -61,8 +61,19 @@ export function demoStore(weekStart) {
     tasks: new Map(tasks.map((x) => [x.id, x])),
     labels: new Map(labels.map((x) => [x.id, x])),
     themes: new Map(),
+    stickers: new Map(),
+    // The glitter star on the lab meeting and on a free afternoon, and on a
+    // day in the month view.
+    placements: new Map([
+      { id: 'demo-s1', stickerId: 'builtin-glitter-star', size: 's', at: 'event', eventId: 'demo-lab', date: day(1), following: false, col: 0, fx: 0.92, fy: 0.15 },
+      { id: 'demo-s2', stickerId: 'builtin-glitter-star', size: 'm', at: 'time', date: day(5), min: 15 * 60, x: 0.5 },
+      { id: 'demo-s3', stickerId: 'builtin-glitter-star', size: 'm', at: 'month', date: day(6), fx: 0.7, fy: 0.62 },
+    ].map((p) => [p.id, { ...p, createdAt: now, updatedAt: now }])),
   };
-  const snap = () => ({ events: new Map(data.events), tasks: new Map(data.tasks), labels: new Map(data.labels), themes: new Map(data.themes), pending: false });
+  const snap = () => ({
+    events: new Map(data.events), tasks: new Map(data.tasks), labels: new Map(data.labels), themes: new Map(data.themes),
+    stickers: new Map(data.stickers), placements: new Map(data.placements), pending: false,
+  });
   const subs = new Set();
   const emit = () => subs.forEach((fn) => fn(snap()));
   return {

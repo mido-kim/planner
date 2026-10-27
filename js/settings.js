@@ -27,6 +27,7 @@ export const DEFAULTS = {
   // (made here and not saved: customTheme) or the id of a saved theme.
   theme: 'system',
   motion: 'slide', // moving to other dates: 'slide' (glides and settles) or 'fade'
+  stickerSize: 'm', // stickers from the tray are stuck at 's', 'm' or 'l'
   customTheme: null, // { base, vars }
   themeCache: null, // { base, vars, css } of a made theme, for theme-boot.js
 };

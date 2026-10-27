@@ -10,6 +10,7 @@ import { dayEndAt, isBarEvent, placeAt, renderTimeGrid, slotOf, taskPlace } from
 import { cssVars, fromHsl, KEYS, mix, PRESETS, presetOf, toHsl } from '../js/themes.js';
 import { DEFAULTS, workSpans } from '../js/settings.js';
 import { doneOps, isDone, symbolOf } from '../js/symbols.js';
+import { clearBackground, onOccurrence, stickerBox, visibleBox } from '../js/stickers.js';
 
 const results = [];
 function test(name, fn) {
@@ -507,6 +508,51 @@ test("themes: a theme's variables, with its mixes", () => {
   const css = cssVars('dark', vars);
   eq([css.bg, css.fill, css['today-tint'], css.work, css['accent-soft']],
     ['#161a24', '30%', '7%', 'color-mix(in srgb, var(--fg) 3% , transparent)'.replace(' ,', ','), 'color-mix(in srgb, var(--accent) 15%, var(--bg))']);
+});
+// ---- stickers
+test('stickers: the background around a picture clears, with a soft edge, and the picture stays', () => {
+  // 8×8 white, with a 4×4 red square in the middle and one pinkish pixel at its edge.
+  const w = 8;
+  const data = new Uint8ClampedArray(w * w * 4).fill(255);
+  const set = (x, y, [r, g, b]) => data.set([r, g, b, 255], (y * w + x) * 4);
+  for (let y = 2; y < 6; y++) for (let x = 2; x < 6; x++) set(x, y, [200, 30, 60]);
+  set(1, 3, [240, 200, 210]);
+  eq(clearBackground(data, w, w), true);
+  const alpha = (x, y) => data[(y * w + x) * 4 + 3];
+  eq([alpha(0, 0), alpha(7, 7), alpha(3, 3), alpha(5, 2)], [0, 0, 255, 255]);
+  if (!(alpha(1, 3) > 0 && alpha(1, 3) < 255)) throw new Error(`the edge pixel should be half see-through, is ${alpha(1, 3)}`);
+  eq(visibleBox(data, w, w), [1, 2, 5, 4]);
+  // Already see-through around the edges: left alone.
+  const clear = new Uint8ClampedArray(w * w * 4);
+  eq(clearBackground(clear, w, w), false);
+});
+test('stickers: sizes follow the hours (timelines) or the day boxes (month), longer side', () => {
+  const wide = { w: 200, h: 100 };
+  eq(stickerBox(wide, 's', 30), [30, 15]);
+  eq(stickerBox(wide, 'm', 30), [60, 30]);
+  eq(stickerBox({ w: 100, h: 200 }, 'l', 20), [35, 70]);
+  eq(stickerBox({ w: 100, h: 100 }, 'm', 100, true).map(Math.round), [55, 55]);
+});
+test("stickers: on an event, a repeating one's day or that day and later ones, and changed days", () => {
+  const one = { id: 'e1' };
+  const series = { id: 's1', rrule: { freq: 'weekly' } };
+  const moved = { id: 'x1', seriesId: 's1', originalDate: '2026-10-21' };
+  eq(onOccurrence({ eventId: 'e1', date: null }, one, '2026-10-20'), true);
+  eq(onOccurrence({ eventId: 'e2', date: null }, one, '2026-10-20'), false);
+  const day = { eventId: 's1', date: '2026-10-21', following: false };
+  const later = { eventId: 's1', date: '2026-10-21', following: true };
+  eq([onOccurrence(day, series, '2026-10-21'), onOccurrence(day, series, '2026-10-28')], [true, false]);
+  eq([onOccurrence(later, series, '2026-10-14'), onOccurrence(later, series, '2026-10-28')], [false, true]);
+  // That day changed by itself (another time): the sticker goes with it.
+  eq([onOccurrence(day, moved, '2026-10-22'), onOccurrence(later, moved, '2026-10-22')], [true, true]);
+  eq(onOccurrence({ ...day, date: '2026-10-28' }, moved, '2026-10-22'), false);
+});
+test('backup: stickers and where they are go out and come back', () => {
+  const sticker = { id: 'k1', name: 'Star', src: 'data:image/png;base64,AAAA', w: 10, h: 10 };
+  const placed = { id: 'p1', stickerId: 'k1', size: 'm', at: 'time', date: '2026-10-21', min: 600, x: 0.5 };
+  const { text } = backupFile(new Map(), new Map(), new Map(), new Map(), new Map([['k1', sticker]]), new Map([['p1', placed]]));
+  eq([parseBackup(text).stickers, parseBackup(text).placements], [[sticker], [placed]]);
+  eq(parseBackup(JSON.stringify({ app: 'planner', events: [], tasks: [] })).placements, []);
 });
 test('backup: saved themes go out and come back', () => {
   const theme = { id: 't1', name: 'Night', base: 'dark', vars: { bg: '#161a24' } };

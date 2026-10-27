@@ -4,13 +4,14 @@ import {
   absMin, addDays, addMonths, dateOf, daysFrom, diffDays, dt, fmt, fmtTime, fmtTimeRange, fromAbsMin, nowMin, parseTime, parts, shiftDays, startOfMonth,
   startOfWeek, timeValue, today,
 } from './dates.js';
-import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, taskEditor } from './dialogs.js';
+import { askScope, createMenu, eventEditor, labelsDialog, settingsDialog, stickerDialog, taskEditor } from './dialogs.js';
 import { icons } from './icons.js';
 import { deleteLabelOps, labelUsage, setLabelStatusOps } from './labels.js';
 import { expand, spanDays } from './recurrence.js';
 import { deadlineToTaskOps, deleteOps, isRepeating, masterOf, moveOps, saveOps, taskToDeadlineOps } from './series.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { localStore, readLocalData } from './store.js';
+import { BUILT_IN as STOCK_STICKERS, makeSticker, onOccurrence, SIZES, stickerBox } from './stickers.js';
 import { doneOps } from './symbols.js';
 import { applyTheme, cssVars, PRESETS, presetOf } from './themes.js';
 import { $, esc, readJSON, uid, writeJSON } from './util.js';
@@ -35,6 +36,8 @@ const state = {
   tasks: new Map(),
   labels: new Map(),
   themes: new Map(),
+  stickers: new Map(), // pictures you made into stickers
+  placements: new Map(), // where stickers are stuck
   pending: false,
   sheetOpen: false, // agenda over the month view on narrow screens
   monthGrid: null, // { from, weeks } once the month view is swiped a week up or down
@@ -91,10 +94,13 @@ function start(s) {
     state.tasks = snap.tasks;
     state.labels = snap.labels || new Map();
     state.themes = snap.themes || new Map();
+    state.stickers = snap.stickers || new Map();
+    state.placements = snap.placements || new Map();
     state.pending = snap.pending;
     keepThemeLook();
     showTheme();
     render();
+    drawTray();
     refreshOpenDialog?.();
     if (first && store.kind === 'cloud') setTimeout(offerLocalCopy, 300);
     first = false;
@@ -124,6 +130,7 @@ async function startDemo(params) {
     case 'task': editTask(s.samples.task); break;
     case 'labels': manageLabels(); break;
     case 'settings': openSettings(); break;
+    case 'stickers': toggleTray(true); break;
   }
 }
 
@@ -148,6 +155,7 @@ function renderShell() {
     <div class="seg" role="group" aria-label="View">
       <button data-view="day">Day</button><button data-view="week">Week</button><button data-view="2week" aria-label="2 weeks"><span class="lg">2 Weeks</span><span class="sm">2 Wk</span></button><button data-view="month">Month</button>
     </div>
+    <button class="icon-btn stickers-btn" data-action="stickers" aria-label="Stickers" title="Stickers" aria-pressed="false">${icons.sticker}</button>
     <button class="icon-btn tasks-btn" data-action="toggle-tasks" aria-label="Agenda" title="Show or hide the agenda">${icons.tasks}<span class="badge" id="task-badge" hidden></span></button>
     <button class="icon-btn settings-btn" data-action="settings" aria-label="Settings">${icons.settings}<span class="sync-dot" id="sync-dot" hidden></span></button>
     <div class="new-group" role="group" aria-label="New">
@@ -174,7 +182,8 @@ function renderShell() {
       <div class="tasks-list" id="task-list"></div>
     </aside>
   </div>
-  <div class="banner" id="banner" hidden></div>`;
+  <div class="banner" id="banner" hidden></div>
+  <div class="stk-tray" id="stk-tray" role="dialog" aria-label="Stickers" hidden></div>`;
   calObserver?.disconnect();
   calObserver?.observe($('#cal'));
 }
@@ -266,6 +275,7 @@ function renderCalendar(r, rangeChanged, occs) {
   squeezeMinis($('#cal'));
   arrangeLabels($('#cal'));
   fitText($('#cal'));
+  drawStickers($('#cal'));
 }
 
 // A 2-week block too short for a line of text below its top room shows its
@@ -344,6 +354,25 @@ function fitText(root) {
     el.style.setProperty('--lh', `${lh}px`);
   }
   for (const el of root.querySelectorAll(ONE_LINE)) el.classList.toggle('fade', el.scrollWidth > el.clientWidth + 1);
+  // Notes take whole lines of the room left in their block, the last one
+  // faded when there's more; with no room for a line they don't show.
+  for (const el of root.querySelectorAll('.ev:not(.short) .ev-n')) {
+    el.style.maxHeight = '';
+    el.classList.remove('fade-last', 'none');
+    const box = el.parentElement;
+    const lh = parseFloat(getComputedStyle(el).lineHeight) || 14;
+    const room = box.getBoundingClientRect().bottom - parseFloat(getComputedStyle(box).paddingBottom) - el.getBoundingClientRect().top;
+    if (room < lh - 1) {
+      el.classList.add('none');
+      continue;
+    }
+    const lines = Math.floor((room + 1) / lh);
+    el.style.maxHeight = `${lines * lh}px`;
+    if (el.scrollHeight > lines * lh + 1) {
+      el.style.setProperty('--lh', `${lh}px`);
+      el.classList.add('fade-last');
+    }
+  }
 }
 
 function drawCalendar(r, rangeChanged, occs) {
@@ -613,7 +642,7 @@ function shiftWeek(dir, swipe = null) {
 // week up or down in the month view moves by exactly one row, so the weeks
 // still on screen just glide up. After a swipe the glide sets off at the
 // finger's own speed, so letting go doesn't stop and restart the dates.
-const MOVERS = '.tg-grid > :not(.tg-corner, .tg-adlabel, .tg-axis), .mv-week, .tw-week';
+const MOVERS = '.tg-grid > :not(.tg-corner, .tg-adlabel, .tg-axis), .mv-week, .mv > .stk-layer, .tw-week';
 const GLIDE_MS = 520;
 const DAMPING = 0.86; // the mouse wheel and buttons: settles after overshooting a hair
 const SWIPE_DAMPING = 0.9; // after a finger: a touch calmer
@@ -813,6 +842,7 @@ const actions = {
   prev: () => move(-1),
   next: () => move(1),
   'toggle-tasks': toggleTasks,
+  stickers: () => toggleTray(),
   dock: toggleDock,
   'new-event': () => newEvent(state.date),
   'new-deadline': () => newDeadline(defaultDay()),
@@ -1309,6 +1339,7 @@ function wireSwipes() {
 function wireGestures() {
   wireMoves();
   wireSwipes();
+  wireStickers();
   // Mouse and pen: press, drag, let go.
   app.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
@@ -1415,6 +1446,274 @@ function wireGestures() {
   // A long press would otherwise bring up the browser's menu.
   app.addEventListener('contextmenu', (e) => {
     if (press || sel || mv || surfaceAt(e.target)) e.preventDefault();
+  });
+}
+
+// ---------------------------------------------------------------- Stickers
+
+// Stickers (stickers.js). The tray (toolbar button) lists them, with the size
+// new ones are stuck at and a button to make one from a picture. Drag one
+// from the tray onto the calendar to stick it there: onto an event on a
+// timeline, it goes with that event (on a repeating one you're asked: that
+// day only, or that day and every later one); anywhere else it stays at that
+// day and time, or on that day in the month view. A stuck sticker moves by
+// dragging it (on a touch screen, hold it first); a tap offers its sizes and
+// Remove.
+
+const allStickers = () => new Map([...STOCK_STICKERS, ...state.stickers.values()].map((x) => [x.id, x]));
+let trayOpen = false;
+let trayEdit = false; // stickers you made show a × to delete them
+let stk = null; // a sticker being dragged (from the tray, or one stuck on)
+
+function toggleTray(open = !trayOpen) {
+  trayOpen = open;
+  trayEdit = false;
+  drawTray();
+}
+
+function drawTray() {
+  const tray = $('#stk-tray');
+  if (!tray) return;
+  tray.hidden = !trayOpen;
+  $('.stickers-btn')?.setAttribute('aria-pressed', trayOpen);
+  if (!trayOpen) return;
+  const size = settings.stickerSize || 'm';
+  const own = [...state.stickers.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  if (!own.length) trayEdit = false;
+  const pick = (x, mine) => `<div class="stk-pick" data-sticker="${esc(x.id)}" role="img" aria-label="${esc(x.name || 'Sticker')}" title="${esc(x.name || 'Sticker')}">
+    <img src="${esc(x.src)}" alt="" draggable="false">${mine && trayEdit ? `<button type="button" class="stk-del" data-stk-del="${esc(x.id)}" aria-label="Delete this sticker">${icons.close}</button>` : ''}</div>`;
+  tray.innerHTML = `
+    <div class="stk-head">
+      <h2>Stickers</h2>
+      <div class="stk-sizes" role="group" aria-label="Size to stick at">${SIZES.map(([k, name]) => `<button type="button" data-stk-size="${k}" aria-pressed="${k === size}" title="${name}">${name[0]}</button>`).join('')}</div>
+      ${own.length ? `<button type="button" class="icon-btn sm" data-stk-act="edit" aria-pressed="${trayEdit}" aria-label="Delete stickers" title="Delete stickers">${icons.pencil}</button>` : ''}
+      <button type="button" class="icon-btn sm" data-stk-act="close" aria-label="Close stickers" title="Close">${icons.close}</button>
+    </div>
+    <div class="stk-list">
+      ${[...STOCK_STICKERS.map((x) => pick(x, false)), ...own.map((x) => pick(x, true))].join('')}
+      <label class="stk-add" title="Make a sticker from a picture"><input type="file" accept="image/*" hidden>${icons.plus}<span>Add</span></label>
+    </div>
+    <p class="stk-tip">${trayEdit ? 'Tap × to delete a sticker you made.' : 'Drag a sticker onto the calendar. Tap a stuck one to resize or remove it.'}</p>`;
+}
+
+async function addSticker(file) {
+  const made = await stickerDialog(file, makeSticker);
+  if (!made) return;
+  const now = Date.now();
+  await commit([{ op: 'put', coll: 'stickers', obj: { id: uid(), ...made, createdAt: now, updatedAt: now } }]);
+}
+
+function deleteSticker(id) {
+  const stuck = [...state.placements.values()].filter((p) => p.stickerId === id);
+  const where = stuck.length ? ` It also comes off the calendar (${stuck.length === 1 ? '1 place' : `${stuck.length} places`}).` : '';
+  if (!confirm(`Delete this sticker?${where}`)) return;
+  commit([{ op: 'remove', coll: 'stickers', id }, ...stuck.map((p) => ({ op: 'remove', coll: 'placements', id: p.id }))], 'Sticker deleted');
+}
+
+// Puts the stickers on the calendar, each view's in its sticker layer: over
+// the day columns of the timelines (each week of the 2-week view has its
+// own), or over the month's days.
+function drawStickers(cal) {
+  const layers = cal?.querySelectorAll('.stk-layer');
+  if (!layers?.length) return;
+  const pics = allStickers();
+  const placed = [...state.placements.values()].filter((p) => pics.has(p.stickerId));
+  const H0 = settings.dayStart * 60;
+  const H1 = settings.dayEnd * 60;
+  const img = (p, x, y, [w, h]) => `<img class="stk" src="${esc(pics.get(p.stickerId).src)}" data-p="${esc(p.id)}" alt="" draggable="false" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px">`;
+  for (const layer of layers) {
+    const host = layer.parentElement;
+    const box = layer.getBoundingClientRect();
+    const html = [];
+    if (host.classList.contains('mv')) {
+      const cells = [...host.querySelectorAll('.mv-cell')];
+      const [cw, ch] = [box.width / 7, box.height / Math.max(1, cells.length / 7)];
+      for (const p of placed) {
+        const i = p.at === 'month' ? cells.findIndex((c) => c.dataset.date === p.date) : -1;
+        if (i >= 0) html.push(img(p, ((i % 7) + p.fx) * cw, (Math.floor(i / 7) + p.fy) * ch, stickerBox(pics.get(p.stickerId), p.size, ch, true)));
+      }
+    } else {
+      const cols = [...host.querySelectorAll(':scope > .tg-col, :scope > .tw-col')];
+      const hour = (box.height * 60) / (H1 - H0);
+      const cw = box.width / Math.max(1, cols.length);
+      for (const p of placed) {
+        const i = p.at === 'time' ? cols.findIndex((c) => c.dataset.date === p.date) : -1;
+        const y = ((Math.min(Math.max(p.min, H0), H1) - H0) / (H1 - H0)) * box.height;
+        if (i >= 0) html.push(img(p, (i + p.x) * cw, y, stickerBox(pics.get(p.stickerId), p.size, hour)));
+      }
+      const onEvents = placed.filter((p) => p.at === 'event');
+      for (const col of onEvents.length ? cols : []) {
+        for (const block of col.querySelectorAll(':scope > .ev')) {
+          const ev = state.events.get(block.dataset.id);
+          if (!ev) continue;
+          const day = diffDays(block.dataset.date, col.dataset.date);
+          let r = null;
+          for (const p of onEvents) {
+            if ((p.col || 0) !== day || !onOccurrence(p, ev, block.dataset.date)) continue;
+            r ||= block.getBoundingClientRect();
+            html.push(img(p, r.left - box.left + p.fx * r.width, r.top - box.top + p.fy * r.height, stickerBox(pics.get(p.stickerId), p.size, hour)));
+          }
+        }
+      }
+    }
+    layer.innerHTML = html.join('');
+  }
+}
+
+// How big an hour is on the timeline shown, or a day box in the month view.
+function stickerUnit() {
+  const layer = $('#cal .stk-layer');
+  if (!layer) return [40, false];
+  const h = layer.getBoundingClientRect().height;
+  if (layer.parentElement.classList.contains('mv')) return [h / Math.max(1, $('#cal').querySelectorAll('.mv-week').length), true];
+  return [(h * 60) / ((settings.dayEnd - settings.dayStart) * 60), false];
+}
+
+// Where a sticker let go at (x, y) sticks, or null for nowhere (outside the
+// calendar, or the question about a repeating event was cancelled). `prev`:
+// where it was stuck before, when moving one.
+async function anchorAt(x, y, prev) {
+  const under = document.elementsFromPoint(x, y).find((el) => !el.closest('.stk, .stk-ghost'));
+  const cal = $('#cal');
+  if (!under?.closest('#cal')) return null;
+  if (cal.querySelector('.mv')) {
+    const cell = [...cal.querySelectorAll('.mv-cell')].find((c) => contains(c, x, y));
+    if (!cell) return null;
+    const r = cell.getBoundingClientRect();
+    return { at: 'month', date: cell.dataset.date, fx: (x - r.left) / r.width, fy: (y - r.top) / r.height };
+  }
+  const block = under.closest('.tg-col > .ev, .tw-col > .ev');
+  const ev = block && state.events.get(block.dataset.id);
+  if (ev) {
+    const r = block.getBoundingClientRect();
+    const date = block.dataset.date;
+    const at = {
+      at: 'event', eventId: ev.id, date: null, following: false,
+      col: diffDays(date, block.parentElement.dataset.date), fx: (x - r.left) / r.width, fy: (y - r.top) / r.height,
+    };
+    if (!ev.rrule) return at;
+    // Moved about on the same days of the same event: no need to ask again.
+    if (prev?.at === 'event' && prev.date && onOccurrence(prev, ev, date)) return { ...at, date: prev.date, following: !!prev.following };
+    const scope = await askScope('sticker');
+    return scope ? { ...at, date, following: scope === 'following' } : null;
+  }
+  const day = dayAt(x, y);
+  const col = day && timeColumn(day);
+  if (!col) return null;
+  const r = col.getBoundingClientRect();
+  return { at: 'time', date: day, min: Math.round(minuteAt(col, y)), x: Math.min(Math.max((x - r.left) / r.width, 0), 1) };
+}
+
+function liftSticker(x, y) {
+  const s = stk;
+  s.on = true;
+  gestureUsed = true; // not a swipe
+  const [unit, month] = stickerUnit();
+  const [w, h] = stickerBox(s.sticker, s.size, unit, month);
+  s.ghost = Object.assign(document.createElement('img'), { className: 'stk-ghost', src: s.sticker.src, alt: '' });
+  Object.assign(s.ghost.style, { width: `${w}px`, height: `${h}px` });
+  document.body.append(s.ghost);
+  s.el?.classList.add('lifted');
+  if (s.touch) navigator.vibrate?.(10);
+  followSticker(x, y);
+}
+
+function followSticker(x, y) {
+  if (stk?.ghost) stk.ghost.style.translate = `${x}px ${y}px`;
+}
+
+function dropSticker(s) {
+  clearTimeout(s?.timer);
+  s?.ghost?.remove();
+  s?.el?.classList.remove('lifted');
+  if (stk === s) stk = null;
+}
+
+async function stickerMenu(p, x, y) {
+  const dot = (r) => `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="${r}" fill="currentColor"/></svg>`;
+  const choice = await createMenu({
+    x,
+    y,
+    heading: 'Sticker',
+    choices: [
+      ...SIZES.map(([k, name], i) => [k, dot(3 + i * 2.5), `${name}${(p.size || 'm') === k ? ' ✓' : ''}`]),
+      ['remove', icons.close, 'Remove'],
+    ],
+  });
+  if (choice === 'remove') commit([{ op: 'remove', coll: 'placements', id: p.id }], 'Sticker removed');
+  else if (choice && choice !== p.size) commit([{ op: 'put', coll: 'placements', obj: { ...p, size: choice, updatedAt: Date.now() } }]);
+}
+
+function wireStickers() {
+  // The tray's own buttons.
+  app.addEventListener('click', (e) => {
+    const tray = e.target.closest('#stk-tray');
+    if (!tray) return;
+    const size = e.target.closest('[data-stk-size]');
+    const act = e.target.closest('[data-stk-act]')?.dataset.stkAct;
+    const del = e.target.closest('[data-stk-del]');
+    if (size) {
+      settings.stickerSize = size.dataset.stkSize;
+      persist();
+      drawTray();
+    } else if (act === 'close') toggleTray(false);
+    else if (act === 'edit') {
+      trayEdit = !trayEdit;
+      drawTray();
+    } else if (del) deleteSticker(del.dataset.stkDel);
+  });
+  app.addEventListener('change', (e) => {
+    if (!e.target.closest('#stk-tray') || e.target.type !== 'file') return;
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) addSticker(file);
+  });
+
+  // Dragging: from the tray right away (on a touch screen, sideways scrolls
+  // the tray instead); a stuck one with a mouse right away, with a finger
+  // after holding it.
+  app.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || stk || sel || mv || e.target.closest('[data-stk-del]')) return;
+    const pick = e.target.closest('.stk-pick');
+    const stuck = !pick && e.target.closest('.stk');
+    const p = stuck && state.placements.get(stuck.dataset.p);
+    const sticker = pick ? allStickers().get(pick.dataset.sticker) : p && allStickers().get(p.stickerId);
+    if (!sticker) return;
+    stk = { sticker, size: p ? p.size : settings.stickerSize || 'm', p, el: stuck || null, x: e.clientX, y: e.clientY, id: e.pointerId, touch: e.pointerType === 'touch', on: false };
+    if (stk.touch && p) stk.timer = setTimeout(() => stk && !stk.on && liftSticker(stk.x, stk.y), LONG_PRESS_MS);
+    if (!stk.touch) e.preventDefault();
+  });
+  app.addEventListener('pointermove', (e) => {
+    const s = stk;
+    if (!s || e.pointerId !== s.id) return;
+    if (!s.on) {
+      const far = Math.hypot(e.clientX - s.x, e.clientY - s.y);
+      // A finger moving off a stuck sticker before the hold is up is a swipe.
+      if (s.touch && s.p) return far > 8 && dropSticker(s);
+      if (far < 5) return;
+      liftSticker(e.clientX, e.clientY);
+    }
+    followSticker(e.clientX, e.clientY);
+  });
+  app.addEventListener('pointerup', async (e) => {
+    const s = stk;
+    if (!s || e.pointerId !== s.id) return;
+    dropSticker(s);
+    if (!s.on) {
+      if (s.p) stickerMenu(s.p, e.clientX, e.clientY); // a tap on a stuck sticker
+      return;
+    }
+    const anchor = await anchorAt(e.clientX, e.clientY, s.p);
+    if (!anchor) return;
+    const now = Date.now();
+    const keep = s.p ? { id: s.p.id, createdAt: s.p.createdAt } : { id: uid(), createdAt: now };
+    commit([{ op: 'put', coll: 'placements', obj: { ...keep, stickerId: s.sticker.id, size: s.size, ...anchor, updatedAt: now } }]);
+  });
+  app.addEventListener('pointercancel', (e) => {
+    if (stk && e.pointerId === stk.id) dropSticker(stk);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && stk) dropSticker(stk);
   });
 }
 
@@ -1599,7 +1898,7 @@ function openSettings() {
 }
 
 async function doBackup() {
-  const { name, text } = backupFile(state.events, state.tasks, state.labels, state.themes);
+  const { name, text } = backupFile(state.events, state.tasks, state.labels, state.themes, state.stickers, state.placements);
   if (await saveFile(name, text, 'application/json')) {
     writeJSON(BACKUP_KEY, { ...readJSON(BACKUP_KEY, {}), last: Date.now() });
     updateBanner();
@@ -1624,6 +1923,8 @@ function restoreBackup(text) {
     ...data.tasks.map((obj) => ({ op: 'put', coll: 'tasks', obj })),
     ...data.labels.map((obj) => ({ op: 'put', coll: 'labels', obj })),
     ...data.themes.map((obj) => ({ op: 'put', coll: 'themes', obj })),
+    ...data.stickers.map((obj) => ({ op: 'put', coll: 'stickers', obj })),
+    ...data.placements.map((obj) => ({ op: 'put', coll: 'placements', obj })),
   ], 'Backup restored');
 }
 
@@ -1637,6 +1938,8 @@ function offerLocalCopy() {
   const tasks = Object.values(local.tasks);
   const labels = Object.values(local.labels);
   const themes = Object.values(local.themes);
+  const stickers = Object.values(local.stickers);
+  const placements = Object.values(local.placements);
   if (!events.length && !tasks.length) return;
   if (confirm(`This device has ${events.length} events and ${tasks.length} tasks from before sync was turned on. Copy them to your account?`)) {
     commit([
@@ -1644,6 +1947,8 @@ function offerLocalCopy() {
       ...tasks.map((obj) => ({ op: 'put', coll: 'tasks', obj })),
       ...labels.map((obj) => ({ op: 'put', coll: 'labels', obj })),
       ...themes.map((obj) => ({ op: 'put', coll: 'themes', obj })),
+      ...stickers.map((obj) => ({ op: 'put', coll: 'stickers', obj })),
+      ...placements.map((obj) => ({ op: 'put', coll: 'placements', obj })),
     ]);
   }
 }

@@ -479,18 +479,21 @@ export function eventEditor({ initial, isNew, repeating, settings, labels, manag
 // "This event / This and following / All events". Resolves with the choice or null.
 export function askScope(kind, { allowThis = true } = {}) {
   const del = kind === 'delete';
-  const opts = [allowThis && ['this', 'This event'], ['following', 'This and following events'], ['all', 'All events']].filter(Boolean);
+  // A sticker goes on one occurrence, or on it and every one after it.
+  const stick = kind === 'sticker';
+  const opts = stick ? [['this', 'Just this one'], ['following', 'This and all following events']]
+    : [allowThis && ['this', 'This event'], ['following', 'This and following events'], ['all', 'All events']].filter(Boolean);
   const html = `
   <form class="dlg scope">
     <div class="dlg-body">
-      <h3>${del ? 'Delete repeating event' : 'Save repeating event'}</h3>
+      <h3>${del ? 'Delete repeating event' : stick ? 'Stick on a repeating event' : 'Save repeating event'}</h3>
       ${allowThis ? '' : '<p class="hint">You changed how it repeats, so this applies to more than one event.</p>'}
       ${opts.map(([v, l], i) => `<label class="radio-row"><input type="radio" name="scope" value="${v}" ${i === 0 ? 'checked' : ''}><span>${l}</span></label>`).join('')}
     </div>
     <div class="dlg-foot">
       <span class="spacer"></span>
       <button type="button" class="btn" data-cancel>Cancel</button>
-      <button type="submit" class="btn ${del ? 'danger' : 'primary'}">${del ? 'Delete' : 'Save'}</button>
+      <button type="submit" class="btn ${del ? 'danger' : 'primary'}">${del ? 'Delete' : stick ? 'Stick' : 'Save'}</button>
     </div>
   </form>`;
   return run('small', html, (dlg, finish) => {
@@ -499,6 +502,56 @@ export function askScope(kind, { allowThis = true } = {}) {
       e.preventDefault();
       finish(f.elements.scope.value);
     });
+  }, { backdropCloses: true });
+}
+
+// ---------------------------------------------------------------- New sticker
+
+// Shows a picture made into a sticker by `make` (stickers.js makeSticker:
+// background cleared, cut to what shows) on a checkerboard, small, medium
+// and large. Resolves with { name, src, w, h } to keep, or null.
+export function stickerDialog(file, make) {
+  const html = `
+  <form class="dlg stk-new">
+    <div class="dlg-head"><h2>New sticker</h2><button type="button" class="icon-btn" data-cancel aria-label="Close">${icons.close}</button></div>
+    <div class="dlg-body">
+      <div class="stk-preview"><p class="hint">Making the sticker…</p></div>
+      <label class="field-row toggle-row"><span class="lbl">Clear the background <span class="hint">(the color around the edges)</span></span><input type="checkbox" name="clear" class="switch" checked></label>
+      <p class="hint stk-note"></p>
+    </div>
+    <div class="dlg-foot">
+      <span class="spacer"></span>
+      <button type="button" class="btn" data-cancel>Cancel</button>
+      <button type="submit" class="btn primary" disabled>Add sticker</button>
+    </div>
+  </form>`;
+  return run('small', html, (dlg, finish) => {
+    const f = dlg.querySelector('form');
+    const add = f.querySelector('[type=submit]');
+    const preview = f.querySelector('.stk-preview');
+    const note = f.querySelector('.stk-note');
+    let made = null;
+    const draw = async () => {
+      add.disabled = true;
+      made = null;
+      try {
+        made = await make(file, f.elements.clear.checked);
+      } catch (err) {
+        preview.innerHTML = `<p class="hint">${esc(err.message || err)}</p>`;
+        return;
+      }
+      preview.innerHTML = [28, 48, 84].map((px) => `<img src="${made.src}" alt="" style="height:${px}px">`).join('');
+      note.textContent = f.elements.clear.checked && !made.cleared
+        ? 'This picture’s background is already see-through.'
+        : 'Pictures on one plain color come out cleanest. Drag the sticker onto the calendar from the sticker tray.';
+      add.disabled = false;
+    };
+    f.elements.clear.addEventListener('change', draw);
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (made) finish({ name: file.name.replace(/\.[^.]+$/, '').slice(0, 60), src: made.src, w: made.w, h: made.h });
+    });
+    draw();
   }, { backdropCloses: true });
 }
 

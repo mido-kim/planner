@@ -1,6 +1,7 @@
 // Sync through Firebase: email sign-in plus a Firestore database that keeps a
 // copy on each device, so the app also works offline and catches up later.
-// Data lives under users/{uid}/events, …/tasks, …/labels and …/themes.
+// Data lives under users/{uid}/events, …/tasks, …/labels, …/themes,
+// …/stickers (the pictures) and …/placements (where they're stuck).
 
 const SDK = 'https://www.gstatic.com/firebasejs/12.6.0';
 
@@ -33,7 +34,7 @@ export async function connectCloud(config) {
         subscribe(fn) {
           const maps = {};
           const pending = {};
-          const colls = ['events', 'tasks', 'labels', 'themes'];
+          const colls = ['events', 'tasks', 'labels', 'themes', 'stickers', 'placements'];
           const emit = () => {
             if (colls.every((c) => maps[c])) fn({ ...maps, pending: colls.some((c) => pending[c]) });
           };

@@ -61,6 +61,17 @@ and setup, CHANGELOG.md for history.
 - `js/dialogs.js`: event/deadline editor (repeat presets + custom, shape,
   label picker, symbol picker), scope dialog, task editor, labels manager,
   create menu, settings (with the working hours list).
+- Stickers (`js/stickers.js`: `BUILT_IN` (files in `stickers/`),
+  `makeSticker` (canvas: `clearBackground` flood-fills the edge color away,
+  `visibleBox` trims, ≤320px, WebP or PNG data URL), `stickerBox` (S/M/L:
+  hours tall on timelines, share of a day box in the month), `onOccurrence`).
+  main.js "Stickers": the tray (`drawTray`, `#stk-tray`), `drawStickers`
+  fills each view's `.stk-layer` (absolutely placed over the day columns /
+  month weeks, in the grid; a glide mover) after every calendar render,
+  `anchorAt` turns a drop point into a placement (asks `askScope('sticker')`
+  on a repeating event), `wireStickers` drags (tray: right away; stuck: mouse
+  right away, touch after LONG_PRESS_MS) and the tap menu. Event notes:
+  `.ev-n` in timegrid.js blocks, fitted to whole lines in `fitText`.
 - `js/symbols.js`: the check-off symbols (outline → filled; parts `s` / `d` /
   `k` in each SVG, styled in css under `.sym`), `symbolOf` (event's own, its
   label's, else 'check'; deadlines 'flag'), `isDone`, `doneOps`,
@@ -142,8 +153,14 @@ Saved themes come only from the old theme maker; they still show and sync.
 An item's `color` is null when it follows its label (`colorOf` in labels.js).
 Missing fields mean their default (older data has none of the new ones).
 
+Sticker: `{ id, name, src, w, h, createdAt, updatedAt }` (`src` a data URL).
+Placement: `{ id, stickerId, size: 's' | 'm' | 'l', at, … }`: at 'time'
+`{ date, min, x }`, at 'event' `{ eventId, date (repeating only), following,
+col, fx, fy }`, at 'month' `{ date, fx, fy }` (see stickers.js).
+
 Firestore paths: `users/{uid}/events/{id}`, `users/{uid}/tasks/{id}`,
-`users/{uid}/labels/{id}`, `users/{uid}/themes/{id}`.
+`users/{uid}/labels/{id}`, `users/{uid}/themes/{id}`,
+`users/{uid}/stickers/{id}`, `users/{uid}/placements/{id}`.
 Display settings are per device in localStorage (`js/settings.js`).
 
 ## Working here

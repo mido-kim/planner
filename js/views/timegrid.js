@@ -267,6 +267,7 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
       <div class="tg-corner"></div>${heads.join('')}
       <div class="tg-adlabel" style="height:${strip.height}px">all-day</div>${strip.html}
       <div class="tg-axis" style="height:${colH}px">${labelsHtml.join('')}</div>${bodies.join('')}
+      <div class="stk-layer" aria-hidden="true"></div>
     </div>
   </div>`;
 }
@@ -322,6 +323,7 @@ export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), set
       <div class="tw-corner"></div>${heads.join('')}
       <div class="tw-adlabel" style="height:${strip.height}px"></div>${strip.html}
       <div class="tw-axis">${axis.join('')}</div>${bodies.join('')}
+      <div class="stk-layer" aria-hidden="true"></div>
     </div>`;
   });
   return `<div class="tw" style="--hours:${(H1 - H0) / 60}">${weeks.join('')}</div>`;
@@ -405,15 +407,20 @@ function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX, labels = new Map()
   const cls = ['ev', `c-${color}`, ev.tentative && 'tent', short && 'short', seg.contTop && 'ct', seg.contBottom && 'cb'].filter(Boolean).join(' ');
   const style = `top:${top}px;height:${height}px;${across(seg)}`;
   // Short blocks put the title first and give it the room; the time only
-  // shows in what's left over.
+  // shows in what's left over. Taller ones have the notes in the room left
+  // below the time.
   const body = short
     ? `<span class="ev-t">${checkButton(occ, labels, 12)}${title}</span><span class="ev-m">${fmtTime(minOf(occ.start), h24)}</span>`
-    : `<span class="ev-t">${checkButton(occ, labels, 12)}${title}</span><span class="ev-m">${time}${repeat}</span>`;
+    : `<span class="ev-t">${checkButton(occ, labels, 12)}${title}</span><span class="ev-m">${time}${repeat}</span>${notesHtml(ev)}`;
   return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}">${body}</div>`;
 }
 
+// An event's notes, in what room its block has left (main.js fitText fades
+// them where they're cut off).
+const notesHtml = (ev) => (ev.notes?.trim() ? `<span class="ev-n">${esc(ev.notes.trim())}</span>` : '');
+
 // In the 2-week view an event is a small block with its title and start time
-// (on the next line when the title fills the first).
+// (on the next line when the title fills the first), then its notes.
 function miniBlock(seg, H0, pct, h24, color, labels) {
   const { occ } = seg;
   const ev = occ.ev;
@@ -421,5 +428,5 @@ function miniBlock(seg, H0, pct, h24, color, labels) {
   const time = fmtTimeRange(minOf(occ.start), minOf(occ.end), h24);
   const cls = ['ev', 'mini', `c-${color}`, ev.tentative && 'tent', seg.contTop && 'ct', seg.contBottom && 'cb'].filter(Boolean).join(' ');
   const style = `top:${(seg.va - H0) * pct}%;height:${(seg.vb - seg.va) * pct}%;${across(seg)}`;
-  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}"><span class="ev-t">${checkButton(occ, labels, 9)}${title}</span><span class="ev-m">${bareTime(minOf(occ.start), h24)}</span></div>`;
+  return `<div class="${cls}" style="${style}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${time}${ev.tentative ? ' (tentative)' : ''}"><span class="ev-t">${checkButton(occ, labels, 9)}${title}</span><span class="ev-m">${bareTime(minOf(occ.start), h24)}</span>${notesHtml(ev)}</div>`;
 }
