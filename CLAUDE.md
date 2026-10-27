@@ -67,7 +67,11 @@ and setup, CHANGELOG.md for history.
   ignores); `CATEGORIES` are the tray's tabs (`settings.stickerSet`). The
   sticker pictures aren't in sw.js SHELL: they're cached as first shown.
   `trayMore` = the tray swiped up (rows; a finger holds a sticker 280ms to
-  lift it), swiped by `traySwipe` on its grip, head or tabs.
+  lift it), swiped by `traySwipe` on its grip, head or tabs. A tap on a tray
+  sticker sets `armed`: the next tap on the calendar (`armTap`) sticks it
+  (`stickAt`), and the other calendar input (selection, moves, clicks) stands
+  aside while `armed`. Touch drags show the ghost `lift` px above the finger
+  and drop there.
   `makeSticker` (canvas: `clearBackground` flood-fills the edge color away,
   `visibleBox` trims, ≤320px, WebP or PNG data URL), `stickerBox` (S/M/L:
   hours tall on timelines, share of a day box in the month), `onOccurrence`).
@@ -80,7 +84,10 @@ and setup, CHANGELOG.md for history.
   picks one (`pickedSticker`: `.stk.picked` with a `.stk-rot` handle, and the
   fixed `#stk-bar` by `placeBar` with sizes and Remove); dragging the handle
   (`turn`) sets `rot` in 15° steps. Event notes:
-  `.ev-n` in timegrid.js blocks, fitted to whole lines in `fitText`.
+  `.ev-n` in timegrid.js blocks, fitted to whole lines in `fitText`; tasks'
+  `.tk-n` and deadlines' `.dl-n` one line under the name. Which kinds show
+  them: `settings.notesEvents/notesTasks/notesDeadlines` (timegrid.js
+  `readNotes` at the start of each render).
 - `js/symbols.js`: the check-off symbols (outline → filled; parts `s` / `d` /
   `k` in each SVG, styled in css under `.sym`), `symbolOf` (event's own, its
   label's, else 'check'; deadlines 'flag'), `isDone`, `doneOps`,

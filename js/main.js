@@ -337,7 +337,7 @@ function arrangeLabels(root) {
 // Text that doesn't fit is cut where the box ends rather than shortened with
 // "…", and fades out toward its end, so the last letters still show. One-line
 // texts fade at the right; titles of several lines fade along their last line.
-const ONE_LINE = '.ev.short .ev-t, .bar-t, .ct, .tk-t, .mtt, .range-title';
+const ONE_LINE = '.ev.short .ev-t, .bar-t, .ct, .tk-t, .tk-n, .dl-n, .mtt, .range-title';
 function fitText(root) {
   if (!root) return;
   for (const el of root.querySelectorAll('.ev:not(.short) .ev-t')) {
@@ -1202,7 +1202,7 @@ async function applyMove(m, minutes) {
 function wireMoves() {
   let down = null; // a mouse press on an item that may become a move
   app.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
+    if (e.pointerType === 'touch' || e.button !== 0 || sel || mv || armed) return;
     const el = e.target.closest(MOVABLE);
     if (!el || e.target.closest('input, .sym')) return;
     down = { el, x: e.clientX, y: e.clientY, id: e.pointerId };
@@ -1343,7 +1343,7 @@ function wireGestures() {
   wireStickers();
   // Mouse and pen: press, drag, let go.
   app.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'touch' || e.button !== 0 || sel || mv) return;
+    if (e.pointerType === 'touch' || e.button !== 0 || sel || mv || armed) return;
     const surface = surfaceAt(e.target);
     if (!surface) return;
     beginSelection(surface, e.clientX, e.clientY);
@@ -1374,7 +1374,7 @@ function wireGestures() {
   };
   app.addEventListener('touchstart', (e) => {
     cancelPress();
-    if (e.touches.length !== 1 || sel || mv) return;
+    if (e.touches.length !== 1 || sel || mv || armed) return;
     const t = e.touches[0];
     const item = e.target.closest(MOVABLE);
     if (item && !e.target.closest('input, .sym')) {
@@ -1457,8 +1457,11 @@ function wireGestures() {
 // from the tray onto the calendar to stick it there: onto an event on a
 // timeline, it goes with that event (on a repeating one you're asked: that
 // day only, or that day and every later one); anywhere else it stays at that
-// day and time, or on that day in the month view. A stuck sticker moves by
-// dragging it (on a touch screen, hold it first). A tap picks it, as in
+// day and time, or on that day in the month view. Or tap a sticker in the
+// tray, then tap the calendar where it goes (easier with a finger; swipes
+// still move the dates meanwhile). A dragged sticker shows above the finger,
+// so you can see where it lands. A stuck sticker moves by dragging it (on a
+// touch screen, hold it first). A tap picks it, as in
 // PowerPoint: an outline, a handle above it to turn it (in steps of 15°) and a
 // bar below with its sizes and Remove; while picked, a finger moves it
 // without holding first.
@@ -1468,6 +1471,8 @@ let trayOpen = false;
 let trayEdit = false; // stickers you made show a × to delete them
 let trayMore = false; // the tray swiped up: rows of stickers instead of one
 let traySwipe = null; // a finger or the mouse swiping the tray up or down
+let armed = null; // a sticker tapped in the tray: the next tap on the calendar sticks it there
+let armTap = null; // that tap, until it's let go (a swipe instead moves the dates)
 let stk = null; // a sticker being dragged (from the tray, or one stuck on)
 let pickedSticker = null; // the placement tapped last, while it shows its handle and bar
 let turn = null; // a picked sticker being turned by its handle
@@ -1475,6 +1480,7 @@ let turn = null; // a picked sticker being turned by its handle
 function toggleTray(open = !trayOpen) {
   trayOpen = open;
   trayEdit = false;
+  armed = null;
   drawTray();
 }
 
@@ -1484,6 +1490,7 @@ function toggleTray(open = !trayOpen) {
 function drawTray() {
   const tray = $('#stk-tray');
   if (!tray) return;
+  app.classList.toggle('stk-armed', !!(trayOpen && armed));
   tray.hidden = !trayOpen;
   $('.stickers-btn')?.setAttribute('aria-pressed', trayOpen);
   if (!trayOpen) return;
@@ -1493,7 +1500,7 @@ function drawTray() {
   if (!own.length || cat !== 'mine') trayEdit = false;
   const pics = allStickers();
   const shown = [...STOCK_STICKERS.filter((x) => x.set === cat), ...(cat === 'mine' ? own : [])];
-  const pick = (x, mine) => `<div class="stk-pick" data-sticker="${esc(x.id)}" role="img" aria-label="${esc(x.name || 'Sticker')}" title="${esc(x.name || 'Sticker')}">
+  const pick = (x, mine) => `<div class="stk-pick${x.id === armed ? ' armed' : ''}" data-sticker="${esc(x.id)}" role="img" aria-label="${esc(x.name || 'Sticker')}" title="${esc(x.name || 'Sticker')}">
     <img src="${esc(x.src)}" alt="" draggable="false" loading="lazy">${mine && trayEdit ? `<button type="button" class="stk-del" data-stk-del="${esc(x.id)}" aria-label="Delete this sticker">${icons.close}</button>` : ''}</div>`;
   const list = tray.querySelector('.stk-list');
   const keep = list && tray.dataset.cat === cat && tray.classList.contains('more') === trayMore ? [list.scrollLeft, list.scrollTop] : [0, 0];
@@ -1515,9 +1522,15 @@ function drawTray() {
     <div class="stk-tabs" role="tablist" aria-label="Sticker sets">
       ${CATEGORIES.map(([id, name, face]) => `<button type="button" role="tab" data-stk-cat="${id}" aria-selected="${id === cat}" aria-label="${name}" title="${name}"><img src="${esc(pics.get(face)?.src || '')}" alt="" draggable="false"></button>`).join('')}
     </div>
-    <p class="stk-tip">${trayEdit ? 'Tap × to delete a sticker you made.' : 'Drag a sticker onto the calendar. Tap a stuck one to turn, resize or remove it.'}</p>`;
+    <p class="stk-tip${armed ? ' armed' : ''}">${trayEdit ? 'Tap × to delete a sticker you made.'
+    : armed ? `Now tap the calendar where ${esc(pics.get(armed)?.name || 'it')} goes. (Tap it again to cancel.)`
+      : 'Tap a sticker, then tap the calendar — or drag it there. Tap a stuck one to turn, resize or remove it.'}</p>`;
   const fresh = tray.querySelector('.stk-list');
   [fresh.scrollLeft, fresh.scrollTop] = keep;
+  if (armed) {
+    const a = fresh.querySelector('.stk-pick.armed');
+    if (a) fresh.scrollLeft = Math.max(0, a.offsetLeft - (fresh.clientWidth - a.offsetWidth) / 2);
+  }
 }
 
 async function addSticker(file) {
@@ -1674,6 +1687,17 @@ async function anchorAt(x, y, prev) {
   return { at: 'time', date: day, min: Math.round(minuteAt(col, y)), x: Math.min(Math.max((x - r.left) / r.width, 0), 1) };
 }
 
+// Sticks `sticker` where (x, y) is on the calendar: a new placement, or
+// placement `p` moved there.
+async function stickAt(sticker, size, p, x, y) {
+  const anchor = await anchorAt(x, y, p);
+  if (!anchor) return;
+  const now = Date.now();
+  const keep = p ? { id: p.id, createdAt: p.createdAt } : { id: uid(), createdAt: now };
+  const rot = p?.rot ? { rot: p.rot } : {};
+  commit([{ op: 'put', coll: 'placements', obj: { ...keep, stickerId: sticker.id, size, ...rot, ...anchor, updatedAt: now } }]);
+}
+
 function liftSticker(x, y) {
   const s = stk;
   s.on = true;
@@ -1683,6 +1707,9 @@ function liftSticker(x, y) {
   s.rot = s.p?.rot || 0;
   s.ghost = Object.assign(document.createElement('img'), { className: 'stk-ghost', src: s.sticker.src, alt: '' });
   Object.assign(s.ghost.style, { width: `${w}px`, height: `${h}px` });
+  // Under a finger it would be hidden: it rides just above it, and lands
+  // where it shows.
+  s.lift = s.touch ? h / 2 + 30 : 0;
   document.body.append(s.ghost);
   s.el?.classList.add('lifted');
   // The tray steps back so the days under it can be dropped on.
@@ -1692,7 +1719,7 @@ function liftSticker(x, y) {
 }
 
 function followSticker(x, y) {
-  if (stk?.ghost) stk.ghost.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) rotate(${stk.rot}deg) scale(1.08)`;
+  if (stk?.ghost) stk.ghost.style.transform = `translate(${x}px, ${y - stk.lift}px) translate(-50%, -50%) rotate(${stk.rot}deg) scale(1.08)`;
 }
 
 function dropSticker(s) {
@@ -1759,6 +1786,11 @@ function wireStickers() {
   app.addEventListener('pointerdown', (e) => {
     // Pressing anywhere else lets go of the picked sticker.
     if (pickedSticker && !e.target.closest('.stk.picked, #stk-bar')) unpickSticker();
+    // A sticker waiting in the tray: a tap on the calendar sticks it.
+    if (armed && e.button === 0 && !stk && !turn && e.target.closest('#cal')) {
+      armTap = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      return;
+    }
     if (e.button !== 0 || stk || turn || sel || mv || e.target.closest('[data-stk-del]')) return;
     // Its handle turns it, about its middle.
     const handle = e.target.closest('.stk-rot');
@@ -1800,13 +1832,24 @@ function wireStickers() {
       const far = Math.hypot(e.clientX - s.x, e.clientY - s.y);
       // A finger moving off a stuck sticker before the hold is up is a swipe
       // (unless it's picked); in the tray's rows, a scroll.
-      if (s.touch && ((s.p && s.p.id !== pickedSticker) || (!s.p && trayMore))) return far > 8 && dropSticker(s);
-      if (far < 5) return;
+      if (s.touch && ((s.p && s.p.id !== pickedSticker) || (!s.p && trayMore))) return far > 12 && dropSticker(s);
+      if (far < (s.touch ? 9 : 5)) return; // a finger wobbles a little in a tap
       liftSticker(e.clientX, e.clientY);
     }
     followSticker(e.clientX, e.clientY);
   });
   app.addEventListener('pointerup', async (e) => {
+    if (armTap && e.pointerId === armTap.id) {
+      const t = armTap;
+      armTap = null;
+      if (Math.hypot(e.clientX - t.x, e.clientY - t.y) > 12) return; // a swipe
+      suppressClickUntil = Date.now() + 400; // not a tap on what's there
+      const sticker = allStickers().get(armed);
+      armed = null;
+      drawTray();
+      if (sticker) stickAt(sticker, settings.stickerSize || 'm', null, e.clientX, e.clientY);
+      return;
+    }
     if (traySwipe && e.pointerId === traySwipe.id) {
       const dx = e.clientX - traySwipe.x;
       const dy = e.clientY - traySwipe.y;
@@ -1830,17 +1873,20 @@ function wireStickers() {
     dropSticker(s);
     if (!s.on) {
       if (s.p) pickSticker(s.p.id); // a tap on a stuck sticker
+      else {
+        // A tap on one in the tray: it waits for a tap on the calendar (on
+        // a phone the tray goes back to one row, out of the way).
+        armed = armed === s.sticker.id ? null : s.sticker.id;
+        if (armed && innerWidth <= 760) trayMore = false;
+        drawTray();
+      }
       return;
     }
-    const anchor = await anchorAt(e.clientX, e.clientY, s.p);
-    if (!anchor) return;
-    const now = Date.now();
-    const keep = s.p ? { id: s.p.id, createdAt: s.p.createdAt } : { id: uid(), createdAt: now };
-    const rot = s.p?.rot ? { rot: s.p.rot } : {};
-    commit([{ op: 'put', coll: 'placements', obj: { ...keep, stickerId: s.sticker.id, size: s.size, ...rot, ...anchor, updatedAt: now } }]);
+    stickAt(s.sticker, s.size, s.p, e.clientX, e.clientY - (s.lift || 0));
   });
   app.addEventListener('pointercancel', (e) => {
     if (traySwipe && e.pointerId === traySwipe.id) traySwipe = null;
+    if (armTap && e.pointerId === armTap.id) armTap = null;
     if (stk && e.pointerId === stk.id) dropSticker(stk);
     if (turn && e.pointerId === turn.id) {
       turn.wrap.style.setProperty('--rot', `${turn.p.rot || 0}deg`);
@@ -1850,7 +1896,10 @@ function wireStickers() {
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && stk) dropSticker(stk);
-    else if (e.key === 'Escape') unpickSticker();
+    else if (e.key === 'Escape' && armed) {
+      armed = null;
+      drawTray();
+    } else if (e.key === 'Escape') unpickSticker();
     else if ((e.key === 'Delete' || e.key === 'Backspace') && pickedSticker && !e.target.closest?.('input, textarea, select, [contenteditable]')) {
       e.preventDefault();
       removePicked();
@@ -1863,6 +1912,7 @@ function wireStickers() {
 function wireEvents() {
   app.addEventListener('click', (e) => {
     const t = e.target;
+    if (armed && t.closest('#cal')) return; // a waiting sticker gets the tap
     if (t.matches('[data-toggle]')) return; // ticking a task off is handled on change
     const check = t.closest('[data-check]');
     if (check) return toggleCheck(check.dataset.check, check.dataset.date);

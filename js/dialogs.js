@@ -872,6 +872,7 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, pre
         ${fieldRow('Time format', '<select name="h24"><option value="0">12-hour (1:30 PM)</option><option value="1">24-hour (13:30)</option></select>')}
         ${fieldRow('Working hours', `<ul class="work-list"></ul><button type="button" class="btn sm" data-act="addWork">${icons.plus}Add hours</button>`, 'work-hours')}
         <label class="field-row toggle-row"><span class="lbl">Shade working hours <span class="hint">(weekdays that aren’t holidays)</span></span><input type="checkbox" name="showWork" class="switch"></label>
+        ${fieldRow('Notes on the calendar', ['Events', 'Tasks', 'Deadlines'].map((k) => `<label class="pick-chip"><input type="checkbox" name="notes${k}"><span>${k}</span></label>`).join(''), 'notes-row')}
       </section>
       <section>
         <h3>Labels</h3>
@@ -921,6 +922,9 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, pre
     });
     drawWork([...settings.workRanges].sort((a, b) => a[0] - b[0]));
     f.elements.showWork.checked = !!settings.showWork;
+    f.elements.notesEvents.checked = settings.notesEvents !== false;
+    f.elements.notesTasks.checked = !!settings.notesTasks;
+    f.elements.notesDeadlines.checked = !!settings.notesDeadlines;
     f.elements.weekStart.value = settings.weekStart;
     f.elements.h24.value = settings.h24 ? 1 : 0;
     f.elements.motion.value = settings.motion;
@@ -956,6 +960,9 @@ export function settingsDialog({ settings, sync, lastBackup, labels, themes, pre
       h24: f.elements.h24.value === '1',
       workRanges: readWork(),
       showWork: f.elements.showWork.checked,
+      notesEvents: f.elements.notesEvents.checked,
+      notesTasks: f.elements.notesTasks.checked,
+      notesDeadlines: f.elements.notesDeadlines.checked,
     });
     f.addEventListener('change', (e) => {
       if (e.target.name !== 'restoreFile') changed();

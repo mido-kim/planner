@@ -19,6 +19,13 @@ import { barHtml, layoutBars } from './bars.js';
 // in the all-day row, across the days they cover.
 
 const MIN_PX = 20; // shortest an event block can be drawn, so it stays tappable
+
+// Which kinds show their notes on the calendar: set from the settings at the
+// start of each render.
+let notesOn = { events: true, tasks: false, deadlines: false };
+const readNotes = (s) => {
+  notesOn = { events: s.notesEvents !== false, tasks: !!s.notesTasks, deadlines: !!s.notesDeadlines };
+};
 const MIN_HOUR_PX = 8; // below this, a day too long for the screen scrolls after all
 const TASK_PX = 18; // height of a task chip
 const TAG_PX = 16; // height of a deadline's title tag
@@ -191,6 +198,7 @@ export const dayEndAt = (H0, H1, colH, ppm) => (H1 > 1440 && H0 < 1440 ? (1440 -
 // squeezed to fit it, so nothing scrolls up and down; `headH` is the height
 // of the day headers. Without it, an hour is `settings.hourHeight` tall.
 export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), settings, fitHeight = 0, headH = 52 }) {
+  readNotes(settings);
   const H0 = settings.dayStart * 60;
   const H1 = settings.dayEnd * 60;
   const h24 = settings.h24;
@@ -275,6 +283,7 @@ export function renderTimeGrid({ days, occs, tasks = [], labels = new Map(), set
 // Two weeks as two short timelines, one above the other. Positions are in
 // percent of each day column, so the hours stretch to whatever room there is.
 export function renderTwoWeeks({ days, occs, tasks = [], labels = new Map(), settings }) {
+  readNotes(settings);
   const H0 = settings.dayStart * 60;
   const H1 = settings.dayEnd * 60;
   const pct = 100 / (H1 - H0);
@@ -336,7 +345,9 @@ function chip(occ, color, cls, html, style) {
 // A task with a tick box. Ticking marks it done; anywhere else opens it.
 function taskChip(task, color, cls, before, style) {
   const title = esc(task.title || '(No title)');
-  return `<div class="${cls} c-${color}${task.done ? ' done' : ''}" style="${style}" role="button" tabindex="0" data-task="${esc(task.id)}"${task.dueTime ? '' : ' data-notime'} title="${title}${task.done ? ' (done)' : ''}">${before}<input type="checkbox" data-toggle="${esc(task.id)}" ${task.done ? 'checked' : ''} aria-label="Done"><span class="tk-t">${title}</span></div>`;
+  // On the timelines, its notes on one line below (when they're shown).
+  const notes = cls === 'tchip' && notesOn.tasks && task.notes?.trim() ? `<span class="tk-n">${esc(task.notes.trim())}</span>` : '';
+  return `<div class="${cls} c-${color}${task.done ? ' done' : ''}${notes ? ' has-n' : ''}" style="${style}" role="button" tabindex="0" data-task="${esc(task.id)}"${task.dueTime ? '' : ' data-notime'} title="${title}${task.done ? ' (done)' : ''}">${before}<input type="checkbox" data-toggle="${esc(task.id)}" ${task.done ? 'checked' : ''} aria-label="Done"><span class="tk-t">${title}</span>${notes}</div>`;
 }
 
 // A deadline's flag checks it off, which crosses its name out.
@@ -345,7 +356,9 @@ function deadlineLine(occ, top, h24, color, below, labels) {
   const title = esc(ev.title || '(No title)');
   const due = ev.allDay ? 'due that day' : `due ${fmtTime(minOf(occ.start), h24)}`;
   const cls = ['dl', `c-${color}`, below && 'below', ev.allDay && 'day-end', isDone(occ) && 'done'].filter(Boolean).join(' ');
-  return `<div class="${cls}" style="top:${top}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${due}"><span class="dl-tag">${checkButton(occ, labels, 11)}<span class="ct">${title}</span></span></div>`;
+  // Its notes on one line under its name (when they're shown).
+  const notes = notesOn.deadlines && ev.notes?.trim() ? `<span class="dl-n">${esc(ev.notes.trim())}</span>` : '';
+  return `<div class="${cls}" style="top:${top}" role="button" tabindex="0" data-id="${esc(ev.id)}" data-date="${occ.date}" title="${title}, ${due}"><span class="dl-tag${notes ? ' has-n' : ''}">${checkButton(occ, labels, 11)}<span class="ct">${title}</span>${notes}</span></div>`;
 }
 
 // Splits overlapping events into side-by-side columns. Each event gets a
@@ -417,7 +430,7 @@ function eventBlock(seg, H0, ppm, h24, color, minPx = MIN_PX, labels = new Map()
 
 // An event's notes, in what room its block has left (main.js fitText fades
 // them where they're cut off).
-const notesHtml = (ev) => (ev.notes?.trim() ? `<span class="ev-n">${esc(ev.notes.trim())}</span>` : '');
+const notesHtml = (ev) => (notesOn.events && ev.notes?.trim() ? `<span class="ev-n">${esc(ev.notes.trim())}</span>` : '');
 
 // In the 2-week view an event is a small block with its title and start time
 // (on the next line when the title fills the first), then its notes.

@@ -35,7 +35,7 @@ export function demoStore(weekStart) {
     ev('demo-visit', 'Family visit', null, day(9), day(11), { allDay: true, labelId: 'demo-l-personal', shape: 'line' }),
     ev('demo-dinner', 'Group dinner', 'orange', at(12, 18, 30), at(12, 21), { tentative: true }),
     ev('demo-trip', 'Field trip', 'teal', day(16), day(16), { allDay: true, tentative: true }),
-    ev('demo-abstract', 'Abstract due', null, at(3, 17), at(3, 17), { kind: 'deadline', labelId: 'demo-l-research', doneDates: [day(3)] }),
+    ev('demo-abstract', 'Abstract due', null, at(3, 17), at(3, 17), { kind: 'deadline', labelId: 'demo-l-research', doneDates: [day(3)], notes: 'Through the conference portal.' }),
     ev('demo-hw', 'HW 3 grades due', null, at(5, 23, 59), at(5, 23, 59), { kind: 'deadline', labelId: 'demo-l-teaching' }),
     ev('demo-old', 'Old project report', null, at(10, 12), at(10, 12), { kind: 'deadline', labelId: 'demo-l-old' }),
     ev('demo-ko', '연구실 세미나 준비', null, at(1, 13), at(1, 14, 30), { labelId: 'demo-l-research' }),
@@ -53,7 +53,7 @@ export function demoStore(weekStart) {
     task('demo-t6', 'Pick up dry cleaning', day(2), { dueTime: '11:00', labelId: 'demo-l-personal' }),
     task('demo-t7', '학회 발표자료 만들기', day(3), { labelId: 'demo-l-research' }),
     task('demo-t8', 'Email the committee', day(3), { dueTime: '23:45', labelId: 'demo-l-teaching' }),
-    task('demo-t9', 'Proofread abstract', day(3), { dueTime: '16:30', labelId: 'demo-l-research' }),
+    task('demo-t9', 'Proofread abstract', day(3), { dueTime: '16:30', labelId: 'demo-l-research', notes: 'Check the word limit (250).' }),
   ];
 
   const data = {

@@ -29,6 +29,10 @@ export const DEFAULTS = {
   motion: 'slide', // moving to other dates: 'slide' (glides and settles) or 'fade'
   stickerSize: 'm', // stickers from the tray are stuck at 's', 'm' or 'l'
   stickerSet: 'mine', // the tray's category
+  // Notes written on the calendar (day, week and 2 weeks), by kind.
+  notesEvents: true,
+  notesTasks: false,
+  notesDeadlines: false,
   customTheme: null, // { base, vars }
   themeCache: null, // { base, vars, css } of a made theme, for theme-boot.js
 };

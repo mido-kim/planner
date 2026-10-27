@@ -3,6 +3,22 @@
 Each version lists what changed for you as a user. The version number also
 appears at the bottom of Settings.
 
+## 0.11.1 (2026-10-27)
+
+- Sticking stickers is easier on a phone:
+  - Tap a sticker in the tray (it gets a pink ring), then tap the calendar
+    where it goes. Taps on the calendar stick it rather than opening things,
+    and swipes still move the dates meanwhile. Tap the sticker again to
+    cancel. On a phone the tray goes back to one row so the days show.
+  - A sticker dragged with a finger rides just above it, so you can see where
+    it lands, and lands where it shows.
+  - Small wobbles of a finger count as a tap, not a drag or a swipe.
+  - Stuck stickers are easier to hit with a finger.
+- Settings → Calendar → Notes on the calendar: show the notes of events,
+  tasks and deadlines, each on or off. Tasks and deadlines show theirs on one
+  line under the name, on the day, week and 2-week views. Events stay on;
+  tasks and deadlines start off.
+
 ## 0.11.0 (2026-10-27)
 
 - 127 letter stickers come with the app, cut from three sticker sheets, each

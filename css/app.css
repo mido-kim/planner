@@ -911,6 +911,24 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   cursor: pointer;
 }
 .tchip:hover { background: color-mix(in srgb, var(--c) 35%, transparent); }
+/* Notes under a task's or a deadline's name, on one line (Settings → Notes
+   on the calendar). */
+.tchip.has-n { flex-wrap: wrap; height: auto; min-height: 18px; row-gap: 0; }
+.tk-n, .dl-n {
+  flex: 1 0 100%;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.86em;
+  font-weight: 400;
+  line-height: 1.25;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.tk-n { padding: 0 0 2px 16px; }
+.dl-tag.has-n { flex-wrap: wrap; height: auto; line-height: 16px; }
+.dl-n { padding-left: 14px; line-height: 1.2; }
+.tw .tchip.has-n, .tw .dl-tag.has-n { height: auto; }
+.tw .tk-n { padding-left: 13px; }
 .tk-t { overflow: hidden; min-width: 0; }
 .tchip.done { opacity: 0.55; }
 .tchip.done .tk-t { text-decoration: line-through; }
@@ -1121,6 +1139,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .stk img { display: block; width: 100%; height: 100%; pointer-events: none; }
 .stk.lifted { opacity: 0.25; }
+/* Easier to hit with a finger. */
+@media (pointer: coarse) {
+  .stk::before { content: ""; position: absolute; inset: -8px; }
+}
+/* A sticker waiting in the tray for a tap on the calendar. */
+.stk-pick.armed { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent-strong); }
+.stk-tip.armed { color: var(--accent-ink); font-weight: 600; }
+.stk-armed #cal { cursor: copy; }
 .stk-ghost {
   position: fixed;
   left: 0;
@@ -1616,6 +1642,22 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.4); }
 .work-range .icon-btn { flex: none; color: var(--fg-3); }
 .work-hours .btn { align-self: flex-start; }
 .work-hours .btn svg { width: 14px; height: 14px; color: var(--fg-2); }
+/* Notes on the calendar: a chip for each kind. */
+.notes-row .ctl { gap: 6px; }
+.pick-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.pick-chip span {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  color: var(--fg-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pick-chip input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.pick-chip input:focus-visible + span { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
 .settings .btn-stack { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
 .settings .btn-stack .btn { justify-content: flex-start; }
 .sync-line { display: flex; gap: 8px; align-items: flex-start; color: var(--fg-2); font-size: 13px; }
